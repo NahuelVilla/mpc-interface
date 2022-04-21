@@ -142,16 +142,18 @@ class Constraint:
         sizes_not_1 = sizes[sizes != 1]
         return sizes_not_1[0]
         
-    def broadcast(self):
-        if self.nlines():
-            if self.extreme.shape[0] == 1:
-                self.extreme = np.resize(self.extreme, [self.nlines, 1])
-                
-            if self.arrow.shape[0] == 1:
-                self.arrow = np.resize(self.arrow, [self.nlines, self.axes_len])
-            
-            if self.center.shape[0] == 1:
-                self.center = np.resize(self.center, [self.nlines, self.axes_len])
+    def broadcast(self, N=None):
+        if self.m or self.t:
+            self.extreme = np.resize(self.extreme, [self.nlines, 1])
+            self.arrow = np.resize(self.arrow, [self.nlines, self.axes_len])
+            self.center = np.resize(self.center, [self.nlines, self.axes_len])
+            return
+        
+        if N:
+            self.extreme = np.resize(self.extreme, [N, 1])
+            self.arrow = np.resize(self.arrow, [N, self.axes_len])
+            self.center = np.resize(self.center, [N, self.axes_len])
+            return
         
     def matrices(self):
         if self.L:
@@ -247,11 +249,11 @@ class Constraint:
         else:
             axes = ""
         
-        text = "\nvariable: "+ self.variable+axes 
+        text = "\nvariable:\n"+" "*7+'"'+self.variable+axes+'"' 
         text+= "\nwith L = " +str(",\n".join(str(l) for l in self.L)) if self.L != [] else ""
-        text+= "\n\t\t\t\t\tarrow: "+ (" "*7).join(str(arrow) for arrow in self.arrow)
-        text+= "\n\t\t\t\t\tcenter: "+ (" "*8).join(str(center) for center in self.center)
-        text+= "\n\t\t\t\t\textreme: "+ (" "*9).join(str(extreme) for extreme in self.extreme)
+        text+= "\narrow:\n"+" "*7+ ("\n"+" "*7).join(str(arrow) for arrow in self.arrow)
+        text+= "\ncenter:\n"+" "*7+ ("\n"+" "*7).join(str(center) for center in self.center)
+        text+= "\nextreme:\n"+" "*7+ ("\n"+" "*7).join(str(extreme) for extreme in self.extreme)
         text+= "\n"
         return text
                
@@ -377,30 +379,30 @@ class Box:
             boundary.update(center=center)
     
     def rotate_in_TS(self, rotations):
-        nlines = self.constraints[0].nlines
-        N = 1 if nlines is None else nlines
-        
         if not isinstance(rotations, list):
-            rotations = [rotations]*N
+            rotations = [rotations]
             
-        if len(rotations) != N and len(rotations) != 1:
-            raise IndexError("'rotations' must contain 1 or {} rotation "+
-                             "matrices".format(N))
+        for limit in self.constraints:
+            limit.broadcast(len(rotations))
             
-        if len(rotations) == 1:
-            rotations *= N
+        N = self.constraints[0].arrow.shape[0]
+            
+        if len(rotations) != N:
+            if len(rotations) == 1:
+                rotations *= N
+            else:
+                raise IndexError("'rotations' must contain 1 or "+
+                              "{} rotation matrices".format(N))
         
         for boundary in self.constraints:
             arrows = boundary.arrow
             
-            if arrows.shape[0] == 1 and N > 1:
-                arrows = np.resize(arrows, (N, boundary.axes_len))
-                
             new_arrows = [n @ R.T for R, n in zip(rotations, arrows)]
             boundary.update(arrow=np.vstack(new_arrows))
             
-        ##TODO: Would it be needed to make an accumulation of rotations along the horizon?
-         ##       or it is correct as it is now?
+        ## TODO: The problem now is that the rotations modify n, so at the next 
+        ## iteration it is rotating on an already rotated arrow. avoid it!
+            
             
     def rotate_in_SS(self, rotations):
         raise NotImplementedError("Maybe later.") 

@@ -123,7 +123,6 @@ class Formulation:
         self.given_ID.update(dict(zip(self.given_variables, given_ranges)))
     
     def set_updating_rule(self, how_to_update=None):
-        
         self.update_incorporations = how_to_update
         
     def update(self, **kargs):

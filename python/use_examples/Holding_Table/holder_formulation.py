@@ -29,7 +29,17 @@ def formulate_biped(conf):
     ##~Steps~##
     E = now.plan_steps(horizon_lenght, 0, regular_time=step_samples)
     F = np.ones([horizon_lenght, 1])
-
+    
+    foot_angle = ExtendedSystem(
+            "Dyawl",
+            "yawl",
+            "yawl",
+            S=F,
+            U=E,
+            how_to_update_matrices=now.update_step_matrices,
+            time_variant=True,
+            )
+    
     steps = ExtendedSystem(
         "Ds",
         "s",
@@ -50,12 +60,6 @@ def formulate_biped(conf):
 
     ##~Non-Linearity~##
     bias = DomainVariable("n", horizon_lenght, axes)
-
-    ##~Feet Orientations~##
-    n_steps = E.shape[1]
-    orientation = DomainVariable(
-        "yawl", n_steps, time_variant=True, how_to_update_size=now.count_yawls
-    )
 
     ## EXTRA DEFINITIONS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     n_coeff = np.diag(np.ones([horizon_lenght - 1]), 1)
@@ -116,9 +120,7 @@ def formulate_biped(conf):
     support_polygon.set_safety_margin(cop_safety_margin)
     terminal_constraint.set_safety_margin(cop_safety_margin)
 
-    #    max_yawl = Constraint("yawl", 0.05)## TODO: implement this with 1D box
-    #    min_yawl = Constraint("yawl", -0.05)
-    yawl_limits = Box.task_space("yawl", np.array([[0.06], [-0.06]]))
+    yawl_limits = Box.task_space("Dyawl", np.array([[0.06], [-0.06]]))
 
     ## COSTS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     relax_ankles_x = Cost(
@@ -149,8 +151,7 @@ def formulate_biped(conf):
         axes=axes,
         schedule=range(horizon_lenght - 1, horizon_lenght),
     )
-    #    orient_feet = Cost("yawl", 0.1, cross="CoM_xy")
-    orient_feet = Cost("yawl", 0.1, aim=0)
+    orient_feet = Cost("Dyawl", 0.1, aim=0.2)
 
     ## TODO: The cost for orientation is time varing. I have to make the funtions to
     ## compute and update the matrices of sin and cos as well as the matrices
@@ -161,7 +162,7 @@ def formulate_biped(conf):
     form.incorporate_dynamics("steps", steps)
     form.incorporate_dynamics("LIP", LIP_ext)
     form.incorporate_dynamics("bias", bias)
-    form.incorporate_dynamics("orientation", orientation)
+    form.incorporate_dynamics("foot_angle", foot_angle)
     form.incorporate_definitions(some_defs)
     form.incorporate_goal("relax ankles x", relax_ankles_x)
     form.incorporate_goal("relax ankles y", relax_ankles_y)
@@ -170,14 +171,12 @@ def formulate_biped(conf):
     form.incorporate_goal("track vel_y", track_vel_y)
     form.incorporate_goal("terminal_cost", terminal_cost)
     form.incorporate_goal("orient_feet", orient_feet)
-    #    form.incorporate_constraint("max_yawl", max_yawl)
-    #    form.incorporate_constraint("min_yawl", min_yawl)
     form.incorporate_box("yawl_limits", yawl_limits)
     form.incorporate_box("stepping area", stepping_area)
     form.incorporate_box("support_polygon", support_polygon)
     form.incorporate_box("terminal_Constraint", terminal_constraint)
 
-    form.identify_qp_domain(["CoM_dddot_x", "Ds_x", "CoM_dddot_y", "Ds_y", "yawl"])  #
+    form.identify_qp_domain(["CoM_dddot_x", "Ds_x", "CoM_dddot_y", "Ds_y", "Dyawl"])
     form.make_preview_matrices()
 
     #    def update_orient_cost(cost, **kargs):
@@ -218,7 +217,7 @@ def formulate_biped(conf):
         """
         step_dynamics_keys = dict(step_times=kargs["step_times"], N=horizon_lenght)
         body.dynamics["steps"].update(**step_dynamics_keys)
-        body.dynamics["orientation"].update(**step_dynamics_keys)
+        body.dynamics["foot_angle"].update(**step_dynamics_keys)
 
         stepping_constraint_keys = dict(
             step_count=kargs["step_count"],
@@ -226,10 +225,10 @@ def formulate_biped(conf):
             xy_lenght=conf.stepping_center,
         )
         body.constraint_boxes["stepping area"].update(**stepping_constraint_keys)
-
-        body.constraint_boxes["support_polygon"].rotate_in_TS(now.rotation2D(0))
-        body.constraint_boxes["terminal_Constraint"].rotate_in_TS(now.rotation2D(0))
-
+        
+        rotations = [now.rotation2D(angle) for angle in kargs["yawl"]]
+        body.constraint_boxes["support_polygon"].rotate_in_TS(rotations)
+        body.constraint_boxes["terminal_Constraint"].rotate_in_TS(rotations[-1])
 
         ## TODO: update the orient_feet cost.
 
