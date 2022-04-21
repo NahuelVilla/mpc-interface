@@ -8,9 +8,8 @@ Created on Sun Mar 20 20:36:32 2022
 
 import numpy as np
 import matplotlib.pyplot as plt
-import biped_configuration as config
+import holder_configuration as config
 from holder_formulation import formulate_biped
-#from self_motivated_steps import formulate_biped ## TODO: MAke a new mpc_loop experimental
 
 from qpsolvers import osqp_solve_qp
 import scipy.sparse as sy
@@ -33,15 +32,15 @@ class Controller:
         self.step_count = 0
         self.n = conf.step_samples
         self.motion["step_times"] = np.array([
-                (i+1)*self.n-1 for i in range(self.form.domain["Ds_x"])
-                ])
+                    (i+1)*self.n-1 for i in range(self.form.domain["Ds_x"])
+                    ])
         
     def count_steps(self):
         self.motion["step_times"] -= 1
         if self.motion["step_times"][0] == -1:
             self.motion["step_times"] += self.n
-            self.step_count += 1 
-        
+            self.step_count += 1
+            
     def current_state(self):
         return np.hstack([self.motion["x0"+axis] for axis in self.axes])
         
@@ -91,7 +90,7 @@ class Controller:
 if __name__ == "__main__":
     o = Controller(config)
     
-    for time in range(100):
+    for time in range(150):
         
         o.decide_actions(time)
         o.preview_all()  # o.preview_horizon()
@@ -100,6 +99,8 @@ if __name__ == "__main__":
         ########### ~~~ Change of time ~~~ ###############
         o.update_given_collector()
         o.count_steps()
+        
+        print(o.motion["yawl"])
         
         
      
