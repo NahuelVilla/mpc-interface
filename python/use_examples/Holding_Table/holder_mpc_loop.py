@@ -46,6 +46,7 @@ class Controller:
         
     def decide_actions(self, time):
         self.form.update(step_times = self.motion["step_times"],
+                         yawl = self.motion["yawl"],
                          step_count = self.step_count)
         self.given = self.form.arrange_given(self.motion)
 
@@ -79,8 +80,11 @@ class Controller:
         for state, ID in self.form.dynamics["steps"].state_ID.items():
             axis = state[-2:]
             self.motion["s0"+axis][ID] = self.motion[state][1]
+        
+        for state, ID in self.form.dynamics["foot_angle"].state_ID.items():
+            self.motion["yawl0"][ID] = self.motion[state][1]
             
-        "In this simple example, we keep the bias equal to zero"
+        #"In this simple example, we keep the bias equal to zero"
         for variable, size in self.form.dynamics["bias"].domain.items():
             o.motion[variable] = np.zeros([size, 1])
             
@@ -90,7 +94,7 @@ class Controller:
 if __name__ == "__main__":
     o = Controller(config)
     
-    for time in range(150):
+    for time in range(5):
         
         o.decide_actions(time)
         o.preview_all()  # o.preview_horizon()
@@ -100,7 +104,7 @@ if __name__ == "__main__":
         o.update_given_collector()
         o.count_steps()
         
-        print(o.motion["yawl"])
+        print(o.form.constraint_boxes["support_polygon"].constraints[0].arrow)
         
         
      
