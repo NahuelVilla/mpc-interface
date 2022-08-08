@@ -17,7 +17,6 @@ from mpc_core.combinations import LineCombo
 
 import holder_configuration as config
 
-
 def formulate_biped(conf):
 
     w = conf.omega
