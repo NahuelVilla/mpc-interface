@@ -156,9 +156,9 @@ def reduce_by_time(box, **kargs):
     box.recenter_in_TS(new_center)
     
     s = (step_duration-landing_advance-current_ss_time)/(step_duration-landing_advance)
-    scale = s if s > 0 else 1e-2 
+    scale = s if s > 0 else 1e-3 
     
-    box.scale_box(scale)
+    box.rescale(scale)
     
 def recenter_on_real_state_x(box, **kargs):
     box.recenter_in_SS(new_center = kargs["x0_x"])
@@ -180,6 +180,17 @@ def adapt_size(stamps, **kargs):
     axis = stamps.variables[0][2:]
     
     Ds_name = "Ds" + axis; x0_name = "s0" + axis
+    Ds_coeff_ID = stamps.variables.index(Ds_name)
+    s0_coeff_ID = stamps.variables.index(x0_name)
+    size = dynamics.domain[Ds_name]
+    
+    stamps.matrices[Ds_coeff_ID] = np.tril(np.ones([size+1, size]), -1)
+    stamps.matrices[s0_coeff_ID] = np.ones([size+1, 1])
+    
+def adapt_size_yawl(stamps, **kargs):
+    dynamics = kargs["extSyst"]
+    
+    Ds_name = "Dyawl"; x0_name = "yawl0"
     Ds_coeff_ID = stamps.variables.index(Ds_name)
     s0_coeff_ID = stamps.variables.index(x0_name)
     size = dynamics.domain[Ds_name]

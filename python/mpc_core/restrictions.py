@@ -62,6 +62,17 @@ class Constraint:
         self.initialize_geometry(arrow, center)
         self.check_geometry()
         self.normalize()
+    
+    @classmethod   
+    def copy(cls, limit):
+        constraint = cls(limit.variable, 
+                         limit.extreme.copy(), 
+                         limit.axes, 
+                         limit.arrow.copy(), 
+                         limit.center.copy(),
+                         limit.L,
+                         limit.schedule)
+        return constraint
         
     def arrange_L(self, L):
         """ This function requires an updated schedule."""
@@ -141,12 +152,29 @@ class Constraint:
         
         sizes_not_1 = sizes[sizes != 1]
         return sizes_not_1[0]
+    
+#    def forecast(self, N=None):
+#        
+#        
+#        if N:
+#            eN = self.extreme.shape[0]
+#            
+#            self.extreme = np.pad(self.extreme, [[0,0],[N,0]], mode="edge")
+#        
+#        
+#        
+        
         
     def broadcast(self, N=None):
         if self.m or self.t:
             self.extreme = np.resize(self.extreme, [self.nlines, 1])
             self.arrow = np.resize(self.arrow, [self.nlines, self.axes_len])
             self.center = np.resize(self.center, [self.nlines, self.axes_len])
+            
+            if N and N != self.nlines:
+                raise ValueError("This bound can only have 1 or "+
+                                 "{} elements.".format(self.m 
+                                                        if self.m else self.t))
             return
         
         if N:
@@ -200,6 +228,7 @@ class Constraint:
             self.check_geometry()
             self.normalize()
         elif center is not None:
+            
             self.check_geometry()
     
     def is_feasible(self, points, space="SS"):
@@ -256,20 +285,115 @@ class Constraint:
         text+= "\nextreme:\n"+" "*7+ ("\n"+" "*7).join(str(extreme) for extreme in self.extreme)
         text+= "\n"
         return text
+    
+class Boxel:
+    def __init__(self, time_variant=None, how_to_update=None):
+        
+        self.constraints = []
+        self.vertices = []
+        self.axes = [""]
+        self.axes_len = 1
+        
+        self.center_TS = []
+        self.center_SS = []
+        self.orientation = []
+        
+        self.schedule = range(0)
+        
+        self.scale = [1]
+        self.safety_margins = [0]
+        
+        self.dimention_SS = 0
+        self.dimention_TS = 0
+        
+        self.cast = 1
+        
+        if how_to_update is None or not time_variant:
+            self.__figuring_out = use.do_not_update
+        else:
+            self.__figuring_out = how_to_update
+            
+    @classmethod        
+    def task_space(cls, variable, vertices, axes=None, schedule=None,
+                   time_variant=None, how_to_update=None):
+        
+        box = cls(time_variant, how_to_update)
+        
+        arrows, extremes, center = box_boundaries(vertices)
+        for i, extreme in enumerate(extremes):
+            box.constraints.append(Constraint(variable, extreme, axes,
+                                              arrows[i], center, None, schedule))           
+        
+        box.variable = variable
+        box.vertices = vertices
+        
+        box.ss_dimention = box.ts_dimention = vertices.shape[1]
+        
+        box.axes = box.constraints[0].axes
+        box.axes_len = len(box.axes)
+        
+        box.schedule = schedule
+        box.center_TS = center
+        box.center_SS = center
+        box.orientation = [np.eye(box.axes_len)]
+        box.scale = [1]
+        box.safety_margins = [0]
+        
+        box.cast = 1
+        return box
+    
+    @classmethod        
+    def state_space(cls, variable, vertices, axes=None, schedule=None,
+                   time_variant=None, how_to_update=None):
+        
+        box = cls(time_variant, how_to_update)
+        
+        arrows_SS, extremes_SS, center_SS = box_boundaries(vertices)
+        center = np.sum(arrows_SS*center_SS, axis=1).reshape([-1, 1])
+        
+        for i, extreme in enumerate(extremes_SS):
+            box.constraints.append(Constraint(variable, extreme, axes=axes,
+                                    center=center[i], L=arrows_SS[i],
+                                    schedule=schedule))
+        
+        box.variable = variable
+        box.vertices = vertices
+        
+        box.ss_dimention = vertices.shape[1]
+        box.ts_dimention = 1
+        
+        box.axes = box.constraints[0].axes
+        box.axes_len = len(box.axes)
+        
+        box.schedule = schedule
+        box.center_SS = center_SS.reshape([-1, 1])
+        box.center_TS = 0
+        box.orientation = [np.eye(box.axes_len)]
+        box.scale = [1]
+        box.safety_margins = [0]
+        
+        box.cast = 1
+        return box
+    
+#    def forecast(self, new_cast):
+#        for bound in self.constraints:
+#            bound.broadcast(new_cast)
+#        
+#        
+#        
+        
                
 class Box:
     def __init__(self, time_variant=None, how_to_update=None):
         
         self.constraints = []
+        self.o_constraints = []
         
         self.ts_vertices = np.array([])
         self.ss_vertices = np.array([])
         self.ts_center = np.array([])
-        self.ts_orientation = []
         self.ss_center = np.array([])
-        self.ss_orientation = []
         
-        self.scale_factor = np.array([1.])
         self.schedule = range(0)
         self.safety_margin = 0
         self.axes = [""]
@@ -283,6 +407,14 @@ class Box:
         else:
             self.__figuring_out = how_to_update
     
+    @property
+    def m(self):
+        return self.constraints[0].m
+    
+    @property
+    def t(self):
+        return self.constraints[0].t
+    
     @classmethod        
     def task_space(cls, variable, vertices, axes=None, L=None, schedule=None,
                    time_variant=None, how_to_update=None):
@@ -293,12 +425,12 @@ class Box:
         for i, extreme in enumerate(extremes):
             box.constraints.append(Constraint(variable, extreme, axes,
                                               arrows[i], center, L, schedule))
+            box.o_constraints.append(Constraint.copy(box.constraints[-1]))
+        
         box.ss_dimention = box.ts_dimention = vertices.shape[1]
         box.axes = box.constraints[0].axes
         box.ts_center = center
         box.ss_center = np.zeros(center.shape)
-        box.ts_orientation = [np.eye(box.ts_dimention)]
-        box.ss_orientation = [np.eye(box.ss_dimention)]
         box.ts_vertices = vertices
         box.schedule = schedule
         return box
@@ -316,24 +448,44 @@ class Box:
             box.constraints.append(Constraint(variable, extreme, axes=axes,
                                     center=center[i], L=arrows_SS[i],
                                     schedule=schedule))
-            box.ss_dimention = vertices.shape[1]
-            box.ts_dimention = 1
-            box.axes = box.constraints[0].axes
-            box.ss_center = center_SS.reshape([-1, 1])
-            box.ts_center = 0
-            box.ss_orientation = [np.eye(box.ss_dimention)]
-            box.ts_orientation = [1]
-            box.ss_vertices = vertices
-            box.schedule = schedule
+            box.o_constraints.append(Constraint.copy(box.constraints[-1]))
+        
+        box.ss_dimention = vertices.shape[1]
+        box.ts_dimention = 1
+        box.axes = box.constraints[0].axes
+        box.ss_center = center_SS.reshape([-1, 1])
+        box.ts_center = 0
+        box.ss_vertices = vertices
+        box.schedule = schedule
         return box
     
+    ## ~~RELOCATIONS~~ ## 
+
+    def _get_dimention(self, size):
+        m = self.m
+        t = self.t
+        bound_size = m if m else (t if t else 1)
+        
+        if bound_size != size:
+            if bound_size == 1:
+                for bound in self.o_constraints:
+                    bound.broadcast(size)
+                return size
+            if size == 1:
+                return bound_size
+            else:
+                raise IndexError("The new locations can be 1 or"+
+                                 "{}, but {} were introduced".format(bound_size,
+                                                                     size))
+        return size
+        
     def recenter_in_TS(self, new_center):
         """ Danger: If the box defines a set in the SS, this function would
         change the shape and size of such set. This deformation can be 
-        corrected by executing 'box.recenter_in_TS(zeros(box.ts_dimention))'.
+        corrected by executing 'box.recenter_in_TS(original_center)'.
         For a safer recentering, use 'recenter_in_SS'.
         """
-        self.ts_center = np.array(new_center)
+        self.ts_center = np.array(new_center) 
         for boundary in self.constraints:
             boundary.update(center=self.ts_center)
     
@@ -356,7 +508,48 @@ class Box:
         self.schedule = new_schedule
         for boundary in self.constraints:
             boundary.update(schedule=self.schedule)
+            
+    def reorient_in_TS(self, orientations):
+        if not isinstance(orientations, list):
+            orientations = [orientations]
+        orientations *= self._get_dimention(len(orientations))
         
+        for i, boundary in enumerate(self.constraints):
+            arrows = self.o_constraints[i].arrow
+            
+            new_arrows = [n @ R.T for R, n in zip(orientations, arrows)]
+            boundary.update(arrow=np.vstack(new_arrows))
+            
+    def rescale(self, factors):
+        if not isinstance(factors, np.ndarray):
+            factors = np.array(factors).flatten()
+        factors = np.resize(factors, self._get_dimention(factors.size))
+        
+        for i, boundary in enumerate(self.constraints):
+            extremes = self.o_constraints[i].extreme
+            
+            boundary.update(extreme = extremes * factors)
+        
+        if self.safety_margin > 0:
+            margin = self.safety_margin; self.safety_margin = 0
+            self.set_safety_margin(margin)
+            
+    def set_safety_margin(self, margins):
+        if not isinstance(margins, np.ndarray):
+            margins = np.array(margins).flatten()
+        margins = np.resize(margins, self._get_dimention(margins.size))
+        
+        for boundary in self.constraints:
+            arrow_norms = np.linalg.norm(boundary.arrow, axis=1)
+            
+            new_extreme = boundary.extreme - arrow_norms * (margins -
+                                                            self.safety_margin)
+            boundary.update(extreme = new_extreme)
+        self.safety_margin = margins
+       
+            
+    ## ~~TRANSFORMATIONS~~ ## 
+    ## TODO: make all the incremental transformations based on the relocations.
     def translate_in_TS(self, translation):
         self.ts_center += translation
         for boundary in self.constraints:
@@ -400,13 +593,11 @@ class Box:
             new_arrows = [n @ R.T for R, n in zip(rotations, arrows)]
             boundary.update(arrow=np.vstack(new_arrows))
             
-        ## TODO: The problem now is that the rotations modify n, so at the next 
-        ## iteration it is rotating on an already rotated arrow. avoid it!
-            
-            
     def rotate_in_SS(self, rotations):
         raise NotImplementedError("Maybe later.") 
-    
+        
+    ## TODO: Make visualization of the box using arrow, extreme and center.
+            
     def is_feasible(self, points, space = "SS"):
         if not isinstance(points, list):
             points = [points]
@@ -418,20 +609,6 @@ class Box:
                          for limit in self.constraints])
                            )
         return feasible
-    
-    def scale_box(self, scale_factor):
-        
-        for boundary in self.constraints:
-            boundary.update(extreme = boundary.extreme * 
-                                      scale_factor/self.scale_factor)
-        self.scale_factor = scale_factor
-        
-    def set_safety_margin(self, margin):
-        
-        for boundary in self.constraints:
-            boundary.update(extreme = boundary.extreme - 
-                            margin*np.linalg.norm(boundary.arrow))
-        self.safety_margin = margin
     
     def update(self, **kargs): 
         self.__figuring_out(self, **kargs)

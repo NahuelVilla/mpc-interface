@@ -12,7 +12,7 @@ system = "J->CCC"
 
 # timing 
 
-num_steps = 2
+num_steps = 3
 mpc_period = 0.1  # [s] nominal sampling period
 
 ss_duration = round(11*mpc_period, 5)
@@ -40,7 +40,7 @@ omega = np.sqrt(-gravity[2] / com_height)
 # goal 
 cop_safety_margin = 0.02
 
-target_vel = np.array([0.6, 0, 0])
+target_vel = np.array([0., 0, 0])
 
 cost_weights = {"minimize jerk": 0.001,
                 "track velocity": 0.01,

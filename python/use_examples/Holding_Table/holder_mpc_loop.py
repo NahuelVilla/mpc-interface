@@ -45,8 +45,9 @@ class Controller:
         return np.hstack([self.motion["x0"+axis] for axis in self.axes])
         
     def decide_actions(self, time):
-        self.form.update(step_times = self.motion["step_times"],
-                         yawl = self.motion["yawl"],
+        self.form.update(yawl = self.motion["yawl"],
+                         stamp_yw = self.motion["stamp_yw"],
+                         step_times = self.motion["step_times"],
                          step_count = self.step_count)
         self.given = self.form.arrange_given(self.motion)
 
@@ -89,23 +90,30 @@ class Controller:
             o.motion[variable] = np.zeros([size, 1])
             
     def save_motion(time, storager):pass
-        
+
+def show_xy(motion):
+    fig = plt.figure()
+    ax = fig.gca()
+    ax.plot(motion["stamps_x"], motion["stamps_y"], "o")
+    ax.plot(motion["CoM_x"], motion["CoM_y"])
+    ax.plot(motion["b_x"], motion["b_y"])
+    ax.plot([-0.2, -0.2, 0.2, 0.2], [-0.2, 0.2, 0.2, -0.2], ".")
+    ax.set_aspect('equal')
 
 if __name__ == "__main__":
     o = Controller(config)
     
-    for time in range(5):
+    for time in range(1000):
         
         o.decide_actions(time)
         o.preview_all()  # o.preview_horizon()
-        o.plot_horizon(time, "_y")
+#        o.plot_horizon(time, "_y")
+        show_xy(o.motion)
         
         ########### ~~~ Change of time ~~~ ###############
         o.update_given_collector()
         o.count_steps()
         
-        print(o.form.constraint_boxes["support_polygon"].constraints[0].arrow)
-        
-        
+#        print(o.form.constraint_boxes["support_polygon"].constraints[0].arrow)
      
         
