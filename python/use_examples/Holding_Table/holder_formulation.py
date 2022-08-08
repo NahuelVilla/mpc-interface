@@ -39,6 +39,10 @@ def formulate_biped(conf):
             how_to_update_matrices=now.update_step_matrices,
             time_variant=True,
             )
+    foot_angle.define_output(
+        "stamp_yw", {"yawl0": 1, "Dyawl": 1}, 
+        time_variant=True, how_to_update=now.adapt_size_yawl
+    )
     
     steps = ExtendedSystem(
         "Ds",
@@ -227,17 +231,32 @@ def formulate_biped(conf):
         body.constraint_boxes["stepping area"].update(**stepping_constraint_keys)
         
         rotations = [now.rotation2D(angle) for angle in kargs["yawl"]]
-        body.constraint_boxes["support_polygon"].rotate_in_TS(rotations)
-        body.constraint_boxes["terminal_Constraint"].rotate_in_TS(rotations[-1])
-
+        feet_orient = [now.rotation2D(angle) for angle in kargs["stamp_yw"]]
+        
+        body.constraint_boxes["support_polygon"].reorient_in_TS(rotations)
+        body.constraint_boxes["terminal_Constraint"].reorient_in_TS(rotations[-1])
+        
+        stepping_orientations = feet_orient[1:body.dynamics["steps"].domain["Ds_x"]+1]
+#        body.constraint_boxes["stepping area"].reorient_in_TS(stepping_orientations)
+        
+        ## TODO: The stepping area should be rotated with respect to the foot,
+        ## but it is rotated with respect to its own center.
+        ## TO solve this it is necessary to recenter after reorient.
+        ## TODO: Box relocations are not working well with the horizon. 
+        ## In particular, the management of horizon samples. Decide how to 
+        ## manage the horizon length. 
+        ## The horizon length could be given when the constraint is created.
+        ## constrant constraints can be set with length =1 anyways.
+        
+        
         ## TODO: update the orient_feet cost.
-
-        ## TODO: update the suport polygon constraint.
-        ## TODO: update the terminal constraint.
+        ## TODO: Set not change of orientation when the velocity is zero.
+        
 
     form.set_updating_rule(update_this_formulation)
 
     return form
+
 
 
 if __name__ == "__main__":

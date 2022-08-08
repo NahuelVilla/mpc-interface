@@ -216,23 +216,23 @@ class RestrictionsTestCase(unittest.TestCase):
                     
         self.assertTrue(all(SSbox.is_feasible(translated_true_points, "SS")))
         
-        SSbox.scale_box(np.sqrt(2))
+        SSbox.rescale(np.sqrt(2))
         for limit in SSbox.constraints:
-            self.assertTrue(limit.extreme == 1.)
+            self.assertTrue((limit.extreme == 1.).all())
             
         TSbox = Box.task_space("CoM", vertices, ["_x", "_y"])
         internal_points = np.split(vertices*0.99, 4)
         external_points = np.split(vertices*1.001, 4)
         
         rotation = np.array([[0, -1], [1, 0]])
-        TSbox.rotate_in_TS(rotation)
+        TSbox.reorient_in_TS(rotation)
         
         self.assertTrue(all(TSbox.is_feasible(internal_points, "TS")))
         self.assertTrue(not all(TSbox.is_feasible(external_points, "TS")))
         
         smaller_rotation = np.array([[np.cos(0.1), -np.sin(0.1)],
                                       [np.sin(0.1), np.cos(0.1)]])
-        TSbox.rotate_in_TS(smaller_rotation)
+        TSbox.reorient_in_TS(smaller_rotation)
         
         self.assertTrue(not all(TSbox.is_feasible(internal_points, "TS")))
         self.assertTrue(not all(TSbox.is_feasible(external_points, "TS")))
