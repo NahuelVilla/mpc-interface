@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Tue Mar 29 20:27:57 2022
+Created on Sun Mar 20 20:15:40 2022
 
 @author: nvilla
 """
 
 import numpy as np
 
-from gecko.dynamics import ControlSystem, ExtendedSystem, DomainVariable
-from gecko.body import Formulation
-import gecko.tools as now
-from gecko.restrictions import Box
-from gecko.goal import Cost
-from gecko.combinations import LineCombo
+from mpc_interface.dynamics import ControlSystem, ExtendedSystem, DomainVariable
+from mpc_interface.body import Formulation
+import mpc_interface.tools as now
+from mpc_interface.restrictions import Box
+from mpc_interface.goal import Cost
+from mpc_interface.combinations import LineCombo
 
-import biped_configuration as config
+import turner_configuration as config
 
 
 def formulate_biped(conf):
@@ -50,6 +50,8 @@ def formulate_biped(conf):
 
     # #~Non-Linearity~##
     bias = DomainVariable("n", horizon_lenght, axes)
+
+    # yawls = DomainVariable("yawl", horizon_lenght)
 
     # #EXTRA DEFINITIONS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     n_coeff = np.diag(np.ones([horizon_lenght - 1]), 1)
@@ -90,24 +92,11 @@ def formulate_biped(conf):
         step_count=0, n_next_steps=steps.domain["Ds_x"], xy_lenght=conf.stepping_center
     )
 
-    def end_of_constraints(box, **kargs):
-        step_times = kargs["step_times"][kargs["step_times"] < horizon_lenght]
-        final_step = step_times[-1]
-        i = 2
-        if final_step + i < horizon_lenght:
-            end = final_step + i
-        else:
-            end = step_times[-2] + i
-
-        box.reschedule(range(end - 1, end))
-
     terminal_constraint = Box.task_space(
         "(DCM-s)",
         support_vertices,
         axes,
         schedule=range(horizon_lenght - 1, horizon_lenght),
-        how_to_update=end_of_constraints,
-        time_variant=True,
     )
 
     cop_safety_margin = conf.cop_safety_margin
@@ -196,9 +185,6 @@ def formulate_biped(conf):
             xy_lenght=conf.stepping_center,
         )
         body.constraint_boxes["stepping area"].update(**stepping_constraint_keys)
-
-        terminal_constraint_keys = dict(step_times=kargs["step_times"])
-        body.constraint_boxes["terminal_Constraint"].update(**terminal_constraint_keys)
 
     form.set_updating_rule(update_this_formulation)
 

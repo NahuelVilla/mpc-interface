@@ -8,8 +8,8 @@ Created on Sun Mar 20 20:36:32 2022
 
 import numpy as np
 import matplotlib.pyplot as plt
-import holder_configuration as config
-from holder_formulation import formulate_biped
+import turner_configuration as config
+from turner_formulation import formulate_biped
 
 # from self_motivated_steps import formulate_biped
 # # TODO: MAke a new mpc_loop experimental
