@@ -12,22 +12,20 @@ This repository is mainly based on python, the c++ part is a work in progress wh
 ## Dependancies
 
 `mpc_interface` depends on the following python packages
-
 [`numpy`](https://numpy.org/install/)
 [`sympy`](https://pypi.org/project/sympy/)
 [`matplotlib`](https://matplotlib.org/stable/users/installing/index.html)
 [`scipy`](https://scipy.org/install/)
-
 that can be installed as follows:
 
 ```bash
 pip3 install numpy sympy matplotlib scipy
 ```
 
-The examples require additionally:
-
+The examples require additionally
 [`qpsolvers`](https://pypi.org/project/qpsolvers/)
 [`osqp`](https://osqp.org/docs/get_started/python.html)
+that can be installed with:
 
 ```bash
 pip3 install qpsolvers osqp
