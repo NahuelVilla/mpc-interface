@@ -53,7 +53,7 @@ class Constraint:
 
             V = [  Lx @ v_x[schedule], Ly @ v_y[schedule], ... ]
 
-        based on the variable v = [v_x, v_y] which is defined by 'variable'.
+        based on the variable v = [v_x, v_y] which is defined by 'variable' and 'axes'.
         """
         self.variable = variable
         self.axes = [""] if axes is None else axes
@@ -65,14 +65,14 @@ class Constraint:
         if L is None:
             self.L = []
         else:
-            self.arrange_L(L)
+            self.__arrange_L(L)
 
         self.extreme = np.array(extreme).reshape([-1, 1]).astype(float)
-        self.initialize_geometry(arrow, center)
-        self.check_geometry()
-        self.normalize()
+        self.__initialize_geometry(arrow, center)
+        self.__check_geometry()
+        self.__normalize()
 
-    def arrange_L(self, L):
+    def __arrange_L(self, L):
         """This function requires an updated schedule."""
         self.L = L if isinstance(L, list) else [L]
 
@@ -89,7 +89,7 @@ class Constraint:
                 + "columns, which is given by the 'schedule'."
             )
 
-    def initialize_geometry(self, arrow, center):
+    def __initialize_geometry(self, arrow, center):
         if arrow is None:
             if self.axes_len == 1:
                 self.arrow = np.ones(self.extreme.shape)
@@ -109,7 +109,7 @@ class Constraint:
         else:
             self.center = np.array(center).reshape([-1, self.axes_len])
 
-    def check_geometry(self):
+    def __check_geometry(self):
         rows = np.array(
             [self.arrow.shape[0], self.center.shape[0], self.extreme.shape[0]]
         )
@@ -131,6 +131,23 @@ class Constraint:
                         + "axis."
                     ).format(cols, self.axes_len)
                 )
+
+    def __normalize(self):
+        if self.arrow.shape[0] != self.extreme.shape[0]:
+            if self.arrow.shape[0] == 1:
+                self.arrow = np.resize(
+                    self.arrow, [self.extreme.shape[0], self.axes_len]
+                )
+            elif self.extreme.shape[0] == 1:
+                self.extreme = np.resize(self.extreme, [self.arrow.shape[0], 1])
+
+        for i, extreme in enumerate(self.extreme):
+            # We adapt the arrow to have always positive extreme
+            if extreme < 0:
+                self.extreme[i] = -self.extreme[i]
+                self.arrow[i] = -self.arrow[i]
+
+        # Is there a good reason to make unit vectors in arrow?
 
     @property
     def m(self):
@@ -161,6 +178,15 @@ class Constraint:
         sizes_not_1 = sizes[sizes != 1]
         return sizes_not_1[0]
 
+    def matrices(self):
+        if self.L:
+            return [self.arrow[:, i][:, None] * l for i, l in enumerate(self.L)]
+        else:
+            return [self.arrow[:, i][:, None] for i in range(self.axes_len)]
+
+    def bound(self):
+        return self.extreme + np.sum(self.arrow * self.center, axis=1).reshape([-1, 1])
+
     def broadcast(self):
         if self.nlines():
             if self.extreme.shape[0] == 1:
@@ -172,38 +198,34 @@ class Constraint:
             if self.center.shape[0] == 1:
                 self.center = np.resize(self.center, [self.nlines, self.axes_len])
 
-    def matrices(self):
-        if self.L:
-            return [self.arrow[:, i][:, None] * l for i, l in enumerate(self.L)]
-        else:
-            return [self.arrow[:, i][:, None] for i in range(self.axes_len)]
+    def __extend(self, element, N, mode = "edge"):
+        n = N - element.shape[0]
+        return np.pad(element, ((0,n),(0,0)), mode)
 
-    def normalize(self):
-        if self.arrow.shape[0] != self.extreme.shape[0]:
-            if self.arrow.shape[0] == 1:
-                self.arrow = np.resize(
-                    self.arrow, [self.extreme.shape[0], self.axes_len]
+    def __shrink(self, element, N):
+        return element[:N, :]
+
+    def forecast(self, N):
+        if self.m or self.t:
+            if not (N == self.nlines or N == 1): 
+                raise IndexError(
+                    (
+                        "The horizon lenght in this constraint was set to {} "
+                        + "by L or the schedule, it is not possible to forecast "
+                        + "it to {}."
+                    ).format(self.nlines, N)
                 )
-            elif self.extreme.shape[0] == 1:
-                self.extreme = np.resize(self.extreme, [self.arrow.shape[0], 1])
-
-        for i, extreme in enumerate(self.extreme):
-            # We adapt the arrow to have always positive extreme
-            if extreme < 0:
-                self.extreme[i] = -self.extreme[i]
-                self.arrow[i] = -self.arrow[i]
-
-    #            Unit vectors in arrow?
-
-    def bound(self):
-        return self.extreme + np.sum(self.arrow * self.center, axis=1).reshape([-1, 1])
-
+        
+        self.arrow = self.__extend(self.arrow, N) if N > self.arrow.shape[0] else self.__shrink(self.arrow, N)
+        self.center = self.__extend(self.center, N) if N > self.center.shape[0] else self.__shrink(self.center, N)
+        self.extreme = self.__extend(self.extreme, N) if N > self.extreme.shape[0] else self.__shrink(self.extreme, N)
+        
     def update(self, extreme=None, arrow=None, center=None, L=None, schedule=None):
         if schedule is not None:
             self.schedule = schedule
 
         if L is not None:
-            self.arrange_L(L)
+            self.__arrange_L(L)
 
         if extreme is not None:
             self.extreme = np.array(extreme).reshape([-1, 1])
@@ -213,10 +235,10 @@ class Constraint:
             self.center = np.array(center).reshape([-1, self.axes_len])
 
         if extreme is not None or arrow is not None:
-            self.check_geometry()
-            self.normalize()
+            self.__check_geometry()
+            self.__normalize()
         elif center is not None:
-            self.check_geometry()
+            self.__check_geometry()
 
     def is_feasible(self, points, space="SS"):
         """Introduce a list of points to verify the feasibility of each
@@ -271,13 +293,13 @@ class Constraint:
             if self.L != []
             else ""
         )
-        text += "\n\t\t\t\t\tarrow: " + (" " * 7).join(
+        text += "\n\t\tarrow: " + ("\n\t\t"+" " * 7).join(
             str(arrow) for arrow in self.arrow
         )
-        text += "\n\t\t\t\t\tcenter: " + (" " * 8).join(
+        text += "\n\t\tcenter: " + ("\n\t\t"+" " * 8).join(
             str(center) for center in self.center
         )
-        text += "\n\t\t\t\t\textreme: " + (" " * 9).join(
+        text += "\n\t\textreme: " + ("\n\t\t"+" " * 9).join(
             str(extreme) for extreme in self.extreme
         )
         text += "\n"
@@ -378,7 +400,7 @@ class Box:
         return box
 
     def recenter_in_TS(self, new_center):
-        """Danger: If the box defines a set in the SS, this function would
+        """Danger: If the box defines a set in the SS, this function may
         change the shape and size of such set. This deformation can be
         corrected by executing 'box.recenter_in_TS(zeros(box.ts_dimention))'.
         For a safer recentering, use 'recenter_in_SS'.

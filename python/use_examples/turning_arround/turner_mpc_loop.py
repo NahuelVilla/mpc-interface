@@ -110,3 +110,5 @@ if __name__ == "__main__":
         # ########## ~~~ Change of time ~~~ ###############
         o.update_given_collector()
         o.count_steps()
+        
+    print("End")
