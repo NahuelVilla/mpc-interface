@@ -82,12 +82,22 @@ class Constraint:
             raise IndexError(
                 "'L' must have 0, 1 or len(axes) = {} elements".format(self.axes_len)
             )
-
-        if self.schedule and np.any([sl.shape[-1] != self.t for sl in self.L]):
-            raise ValueError(
+        
+        for i, sl in enumerate(self.L):
+            self.L[i] = sl if len(L.shape)-1 else sl[None, :]
+            if self.schedule and sl.shape[-1] != self.t:
+                raise ValueError(
                 "arrays in L must have {} ".format(self.t)
                 + "columns, which is given by the 'schedule'."
-            )
+                )
+            
+        
+        
+#        if self.schedule and np.any([sl.shape[-1] != self.t for sl in self.L]):
+#            raise ValueError(
+#                "arrays in L must have {} ".format(self.t)
+#                + "columns, which is given by the 'schedule'."
+#            )
 
     def __initialize_geometry(self, arrow, center):
         if arrow is None:
@@ -205,8 +215,11 @@ class Constraint:
     def __shrink(self, element, N):
         return element[:N, :]
 
-    def forecast(self, N):
+    def forecast(self, N):   
         if self.m or self.t:
+            ##TODO: adapt for the case when m or t are not None.
+            # In this case we could vstack the matrix L according to "N"
+            # Or introduce options to extend or shrink L in different ways.
             if not (N == self.nlines or N == 1): 
                 raise IndexError(
                     (
@@ -398,6 +411,11 @@ class Box:
             box.ss_vertices = vertices
             box.schedule = schedule
         return box
+
+    def forecast(self, cast):
+        for boundary in self.constraints:
+            boundary.forecast(cast)
+        self.cast = cast
 
     def recenter_in_TS(self, new_center):
         """Danger: If the box defines a set in the SS, this function may
