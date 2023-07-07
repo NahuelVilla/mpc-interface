@@ -71,9 +71,9 @@ class DynamicsTestCase(unittest.TestCase):
         # ### Setting extended control systems
         horizon_lenght = 20
 
-        ext_sys1 = dy.ExtendedSystem.from_cotrol_system(cnt_sys1, "x", horizon_lenght)
-        ext_sys2 = dy.ExtendedSystem.from_cotrol_system(cnt_sys2, "e", horizon_lenght)
-        ext_sys3 = dy.ExtendedSystem.from_cotrol_system(cnt_sys3, "r", horizon_lenght)
+        ext_sys1 = dy.ExtendedSystem.from_control_system(cnt_sys1, "x", horizon_lenght)
+        ext_sys2 = dy.ExtendedSystem.from_control_system(cnt_sys2, "e", horizon_lenght)
+        ext_sys3 = dy.ExtendedSystem.from_control_system(cnt_sys3, "r", horizon_lenght)
         self.ext_sys1 = ext_sys1
         self.ext_sys2 = ext_sys2
         self.ext_sys3 = ext_sys3
@@ -144,7 +144,7 @@ class DynamicsTestCase(unittest.TestCase):
             system_name="J->CCC", tau=0.1, omega=3.3445, axes=["_x", "_y"]
         )
 
-        extended_LIP = dy.ExtendedSystem.from_cotrol_system(
+        extended_LIP = dy.ExtendedSystem.from_control_system(
             LIP, state_vector_name="x", horizon_lenght=36
         )
 

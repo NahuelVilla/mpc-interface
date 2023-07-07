@@ -82,7 +82,7 @@ class Constraint:
             raise IndexError(
                 "'L' must have 0, 1 or len(axes) = {} elements".format(self.axes_len)
             )
-        
+
         for i, sl in enumerate(self.L):
             self.L[i] = sl if len(L.shape)-1 else sl[None, :]
             if self.schedule and sl.shape[-1] != self.t:
@@ -90,9 +90,9 @@ class Constraint:
                 "arrays in L must have {} ".format(self.t)
                 + "columns, which is given by the 'schedule'."
                 )
-            
-        
-        
+
+
+
 #        if self.schedule and np.any([sl.shape[-1] != self.t for sl in self.L]):
 #            raise ValueError(
 #                "arrays in L must have {} ".format(self.t)
@@ -215,12 +215,12 @@ class Constraint:
     def __shrink(self, element, N):
         return element[:N, :]
 
-    def forecast(self, N):   
+    def forecast(self, N):
         if self.m or self.t:
             ##TODO: adapt for the case when m or t are not None.
             # In this case we could vstack the matrix L according to "N"
             # Or introduce options to extend or shrink L in different ways.
-            if not (N == self.nlines or N == 1): 
+            if not (N == self.nlines or N == 1):
                 raise IndexError(
                     (
                         "The horizon lenght in this constraint was set to {} "
@@ -228,11 +228,11 @@ class Constraint:
                         + "it to {}."
                     ).format(self.nlines, N)
                 )
-        
+
         self.arrow = self.__extend(self.arrow, N) if N > self.arrow.shape[0] else self.__shrink(self.arrow, N)
         self.center = self.__extend(self.center, N) if N > self.center.shape[0] else self.__shrink(self.center, N)
         self.extreme = self.__extend(self.extreme, N) if N > self.extreme.shape[0] else self.__shrink(self.extreme, N)
-        
+
     def update(self, extreme=None, arrow=None, center=None, L=None, schedule=None):
         if schedule is not None:
             self.schedule = schedule
@@ -416,6 +416,42 @@ class Box:
         for boundary in self.constraints:
             boundary.forecast(cast)
         self.cast = cast
+    @classmethod
+    def task_space_exterior(
+        cls,
+        variables,
+        vertices,
+        center=None,
+        axes=None,
+        L=None,
+        schedule=None,
+        time_variant=None,
+        how_to_update=None,
+    ):
+
+        box = cls(time_variant, how_to_update)
+        if center is None:
+            center = np.array([0, 0])
+
+        simplices, arrows, extremes = exbox_boundaries(vertices, center)
+
+        for i, couple in enumerate(simplices):
+            box.constraints.append(
+                Constraint(variables[couple[0]], extremes[i], axes, arrows[i], center, L, schedule)
+            )
+            box.constraints.append(
+                Constraint(variables[couple[1]], extremes[i], axes, arrows[i], center, L, schedule)
+            )
+
+        box.ss_dimention = box.ts_dimention = vertices.shape[1]
+        box.axes = box.constraints[0].axes
+        box.ts_center = center
+        box.ss_center = np.zeros(center.shape)
+        box.ts_orientation = [np.eye(box.ts_dimention)]
+        box.ss_orientation = [np.eye(box.ss_dimention)]
+        box.ts_vertices = vertices
+        box.schedule = schedule
+        return box
 
     def recenter_in_TS(self, new_center):
         """Danger: If the box defines a set in the SS, this function may
@@ -569,3 +605,45 @@ def box_boundaries(vertices):
     extremes = np.sum(arrows * (furthest_vertex - center), axis=1).reshape([-1, 1])
 
     return arrows, extremes, center
+
+def exbox_boundaries(vertices, center):
+    """vertices is an ndarray with one vertex per row."""
+    vertices = vertices.astype("float64")
+    n, dim = vertices.shape
+
+    # if dim == 1:
+    #     simplices = np.array([[0], [1]])
+    #     arrows = np.ones([2, 1])
+
+    if dim == 2:
+        simplices = sp.ConvexHull(vertices).simplices
+
+        directions = vertices[simplices[:, 0]] - vertices[simplices[:, 1]]
+
+        arrows = np.hstack(
+            [directions[:, 1].reshape(-1, 1), -directions[:, 0].reshape(-1, 1)]
+        )
+
+    # elif dim == 3:
+    #     simplices = sp.ConvexHull(vertices).simplices
+
+    #     d0 = vertices[simplices[:, 0]] - vertices[simplices[:, 2]]
+    #     d1 = vertices[simplices[:, 1]] - vertices[simplices[:, 2]]
+
+    #     arrows = np.hstack(
+    #         [
+    #             (d0[:, 1] * d1[:, 2] - d0[:, 2] * d1[:, 1]).reshape(-1, 1),
+    #             (d0[:, 2] * d1[:, 0] - d0[:, 0] * d1[:, 2]).reshape(-1, 1),
+    #             (d0[:, 0] * d1[:, 1] - d0[:, 1] * d1[:, 0]).reshape(-1, 1),
+    #         ]
+    #     )
+
+    for i, arrow in enumerate(arrows):
+        arrows[i] = arrow / np.linalg.norm(arrow)
+
+    furthest_vertex = -1e-8*vertices[simplices[:, 0]]
+    extremes = np.sum(arrows * (furthest_vertex - center), axis=1).reshape([-1, 1])
+
+    return simplices, arrows, extremes
+
+

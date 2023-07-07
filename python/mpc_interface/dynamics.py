@@ -214,7 +214,7 @@ class ExtendedSystem:
             self.__figuring_out = how_to_update_matrices
 
     @classmethod
-    def from_cotrol_system(cls, control_system, state_vector_name, horizon_lenght):
+    def from_control_system(cls, control_system, state_vector_name, horizon_lenght):
 
         S, U = use.extend_matrices(horizon_lenght, control_system.A, control_system.B)
         if control_system.time_variant:
@@ -380,13 +380,14 @@ class ControlSystem:
     def from_name(
         cls,
         system_name,
+        input_names,
+        state_names,
         axes=None,
         time_variant=False,
         how_to_update_matrices=None,
         **kargs
     ):
-
-        input_names, state_names = use.get_system_variables(system_name)
+        # input_names, state_names = use.get_system_variables(system_name)
 
         get_A, get_B, parameters = use.get_system_matrices(system_name)
         try:

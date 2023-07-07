@@ -237,7 +237,7 @@ def rotation3D(angle, axis="z"):
     return R
 
 
-def get_system_matrices(system):
+def get_system_matrices(system, see_matrices=False):
     """
 
     Parameters
@@ -278,6 +278,10 @@ def get_system_matrices(system):
         parameters = ("tau=None", "**kwargs")
 
     A_, B_ = sy.simplify(discretize(A, B))
+
+    if (see_matrices):
+        print("state matrix: ", A_)
+        print("input matrix: ", B_)
 
     get_matrix_A = sy.lambdify(parameters, A_, "numpy")
     get_matrix_B = sy.lambdify(parameters, B_, "numpy")
