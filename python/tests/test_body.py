@@ -21,7 +21,7 @@ from mpc_interface.combinations import LineCombo
 class BodyTestCase(unittest.TestCase):
     def setUp(self):
 
-        LIP = ControlSystem.from_name("J->CCC", tau=0.1, omega=3.5, axes=["_x", "_y"])
+        LIP = ControlSystem.from_name("J->CCC", ["CoM_dddot"], ["CoM", "CoM_dot", "CoM_ddot"], tau=0.1, omega=3.5, axes=["_x", "_y"])
         LIP_ext = ExtendedSystem.from_control_system(LIP, "x", 9)
         LIP_ext.define_output("DCM", {"CoM": 1, "CoM_dot": 1 / 3.5})
 

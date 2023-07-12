@@ -346,6 +346,18 @@ class Box:
             self.__figuring_out = how_to_update
 
     @classmethod
+    def by_limits(
+        cls,
+        constraints,
+        time_variant=None,
+        how_to_update=None,
+    ):
+        box = cls(time_variant, how_to_update)
+        box.constraints = constraints
+
+        return box
+
+    @classmethod
     def task_space(
         cls,
         variable,

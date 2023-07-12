@@ -85,9 +85,7 @@ class DynamicsTestCase(unittest.TestCase):
                 sizes = kargs["new_sizes"]
             else:
                 sizes = [kargs["new_sizes"]]
-            singVar.domain.update(
-                {var: sizes[ID] for var, ID in singVar.domain_ID.items()}
-            )
+            singVar.domain.update({var: sizes[ID] for var, ID in singVar.domain_ID.items()})
 
         domVar1 = dy.DomainVariable(
             "non_lin",
@@ -127,7 +125,9 @@ class DynamicsTestCase(unittest.TestCase):
         self.assertTrue((self.cnt_sys2.B == self.B).all())
         self.assertTrue((self.cnt_sys3.B == self.B).all())
 
-        LIP = dy.ControlSystem.from_name("J->CCC", ["_x", "_y"], tau=0.1, omega=3.5)
+        LIP = dy.ControlSystem.from_name(
+            "J->CCC", ["dddc"], ["c", "dc", "ddc"], ["_x", "_y"], tau=0.1, omega=3.5
+        )
         self.assertEqual(LIP.parameters["tau"], 0.1)
         self.assertEqual(LIP.parameters["omega"], 3.5)
         correctA = use.get_system_matrices("J->CCC")[0](tau=0.1, omega=3.5)
@@ -141,7 +141,7 @@ class DynamicsTestCase(unittest.TestCase):
             saved_matrices = pickle.load(f)["matrices"]
 
         LIP = dy.ControlSystem.from_name(
-            system_name="J->CCC", tau=0.1, omega=3.3445, axes=["_x", "_y"]
+            "J->CCC", ["dddc"], ["c", "dc", "ddc"], tau=0.1, omega=3.3445, axes=["_x", "_y"]
         )
 
         extended_LIP = dy.ExtendedSystem.from_control_system(
@@ -158,9 +158,7 @@ class DynamicsTestCase(unittest.TestCase):
         self.assertEqual(len(self.ext_sys1.state_ID), n * ax)
         self.assertEqual(len(self.ext_sys2.domain_ID), m * ax + ax)
         self.assertEqual(len(self.ext_sys3.all_variables), n * ax + m * ax + ax)
-        self.assertEqual(
-            len(self.ext_sys1.all_variables), len(self.ext_sys1.definitions.keys())
-        )
+        self.assertEqual(len(self.ext_sys1.all_variables), len(self.ext_sys1.definitions.keys()))
 
         # # Composed updates:
 
@@ -222,9 +220,7 @@ class DynamicsTestCase(unittest.TestCase):
 
         self.domVar1.define_output("n0", {"non_lin": np.array([1] + [0] * 19)})
         self.assertTrue(
-            (
-                self.domVar1.definitions["n0_y"].matrices == np.array([1] + [0] * 19)
-            ).all()
+            (self.domVar1.definitions["n0_y"].matrices == np.array([1] + [0] * 19)).all()
         )
 
 
@@ -234,28 +230,19 @@ def visual_inspection(ext_system):
     norm = colors.BoundaryNorm(bounds, cmap.N)
 
     for state, sID in ext_system.state_ID.items():
-
         if state[-2:] == "_x":
-            print(
-                "\t" * 4
-                + "In following, matrices to "
-                + "obtain the state: '{}'".format(state)
-            )
+            print("\t" * 4 + "In following, matrices to " + "obtain the state: '{}'".format(state))
             state_def = ext_system.definitions[state]
 
             for var in state_def.variables:
                 if var[:-2] == ext_system.state_vector_name + "0":
-                    print(
-                        "The matrix 'S', related to the initial state " + var + ", is: "
-                    )
+                    print("The matrix 'S', related to the initial state " + var + ", is: ")
 
                 else:
                     print("The matrix 'U', related to the input " + var + ", is: ")
 
                 M = state_def.matrices[state_def.variables.index(var)]
-                img = plt.imshow(
-                    M.astype(bool), interpolation="nearest", cmap=cmap, norm=norm
-                )
+                img = plt.imshow(M.astype(bool), interpolation="nearest", cmap=cmap, norm=norm)
                 plt.colorbar(img, cmap=cmap, norm=norm, boundaries=bounds, ticks=[0, 1])
                 plt.show()
 
@@ -264,8 +251,8 @@ if __name__ == "__main__":
     unittest.main()
 
     # FOR MANUAL TEST
-    o = DynamicsTestCase()
-    o.setUp()
+    # o = DynamicsTestCase()
+    # o.setUp()
 
     # to inspect visually the matrices use the following line:
 #    visual_inspection(o.ext_sys1)
