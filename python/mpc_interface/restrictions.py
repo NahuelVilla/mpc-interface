@@ -8,9 +8,13 @@ Created on Sun Jan 17 17:04:15 2021
 import numpy as np
 import scipy.spatial as sp
 import mpc_interface.tools as use
+from enum import Enum
 
 # # TODO: make some visualization of the constraints graphically
 
+class SPACE(Enum):
+    TS = 1
+    SS = 2    
 
 class Constraint:
     def __init__(
@@ -26,19 +30,19 @@ class Constraint:
         """
         ARGUMENTS:
 
-            variable : dict, {name: String, combination: dict }
+            variable_out : dict, {name: String, combination: dict }
 
             axes : list of strings ex: ["_x", "_y", "_z"] always starting "_"
 
-            arrow :   ndarray with shape [m, len(axes)] or list
+            arrow :   ndarray with shape [m, len(axes)] or list len(axes)
 
             extreme : ndarray with shape [m, 1] or single number, or list.
 
-            center :  ndarray with shape [m, len(axes)] or list
+            center :  ndarray with shape [m, len(axes)] or list len(axes)
 
-            L : list of [len(axes)] ndarrays each one with shape [m, t]
+            L : [m, dim] x len(axes)
 
-            schedule : range with t elements with t <= horizon_lenght
+            schedule : ndarray with shape [dim] of bool -> Selecting t values
 
         The null value of L is an empty list [] and the null value of
         schedule is range(0). These values can be used in the update
@@ -53,7 +57,7 @@ class Constraint:
 
             V = [  Lx @ v_x[schedule], Ly @ v_y[schedule], ... ]
 
-        based on the variable v = [v_x, v_y] which is defined by 'variable' and 'axes'.
+        based on the variable_in v = [v_x, v_y] which is defined by 'variable' and 'axes'.
         """
         self.variable = variable
         self.axes = [""] if axes is None else axes
@@ -93,11 +97,11 @@ class Constraint:
 
 
 
-#        if self.schedule and np.any([sl.shape[-1] != self.t for sl in self.L]):
-#            raise ValueError(
-#                "arrays in L must have {} ".format(self.t)
-#                + "columns, which is given by the 'schedule'."
-#            )
+    #    if self.schedule and np.any([sl.shape[-1] != self.t for sl in self.L]):
+    #        raise ValueError(
+    #            "arrays in L must have {} ".format(self.t)
+    #            + "columns, which is given by the 'schedule'."
+    #        )
 
     def __initialize_geometry(self, arrow, center):
         if arrow is None:
@@ -324,21 +328,8 @@ class Box:
 
         self.constraints = []
 
-        self.ts_vertices = np.array([])
-        self.ss_vertices = np.array([])
-        self.ts_center = np.array([])
-        self.ts_orientation = []
-        self.ss_center = np.array([])
-        self.ss_orientation = []
-
-        self.scale_factor = np.array([1.0])
-        self.schedule = range(0)
-        self.safety_margin = 0
-        self.axes = [""]
-        self.ss_dimention = 0
-        self.ts_dimention = 0
-
         self.time_variant = time_variant
+        self.naxes = 0
 
         if how_to_update is None or not time_variant:
             self.__figuring_out = use.do_not_update
@@ -358,20 +349,13 @@ class Box:
     ):
 
         box = cls(time_variant, how_to_update)
+        box.naxes = len(axes)
 
         arrows, extremes, center = box_boundaries(vertices)
         for i, extreme in enumerate(extremes):
             box.constraints.append(
                 Constraint(variable, extreme, axes, arrows[i], center, L, schedule)
             )
-        box.ss_dimention = box.ts_dimention = vertices.shape[1]
-        box.axes = box.constraints[0].axes
-        box.ts_center = center
-        box.ss_center = np.zeros(center.shape)
-        box.ts_orientation = [np.eye(box.ts_dimention)]
-        box.ss_orientation = [np.eye(box.ss_dimention)]
-        box.ts_vertices = vertices
-        box.schedule = schedule
         return box
 
     @classmethod
@@ -386,6 +370,7 @@ class Box:
     ):
 
         box = cls(time_variant, how_to_update)
+        box.naxes = len(axes)
 
         arrows_SS, extremes_SS, center_SS = box_boundaries(vertices)
         center = np.sum(arrows_SS * center_SS, axis=1).reshape([-1, 1])
@@ -401,21 +386,12 @@ class Box:
                     schedule=schedule,
                 )
             )
-            box.ss_dimention = vertices.shape[1]
-            box.ts_dimention = 1
-            box.axes = box.constraints[0].axes
-            box.ss_center = center_SS.reshape([-1, 1])
-            box.ts_center = 0
-            box.ss_orientation = [np.eye(box.ss_dimention)]
-            box.ts_orientation = [1]
-            box.ss_vertices = vertices
-            box.schedule = schedule
         return box
 
     def forecast(self, cast):
         for boundary in self.constraints:
             boundary.forecast(cast)
-        self.cast = cast
+
     @classmethod
     def task_space_exterior(
         cls,
@@ -430,6 +406,7 @@ class Box:
     ):
 
         box = cls(time_variant, how_to_update)
+        box.naxes = len(axes)
         if center is None:
             center = np.array([0, 0])
 
@@ -443,98 +420,168 @@ class Box:
                 Constraint(variables[couple[1]], extremes[i], axes, arrows[i], center, L, schedule)
             )
 
-        box.ss_dimention = box.ts_dimention = vertices.shape[1]
-        box.axes = box.constraints[0].axes
-        box.ts_center = center
-        box.ss_center = np.zeros(center.shape)
-        box.ts_orientation = [np.eye(box.ts_dimention)]
-        box.ss_orientation = [np.eye(box.ss_dimention)]
-        box.ts_vertices = vertices
-        box.schedule = schedule
         return box
 
-    def recenter_in_TS(self, new_center):
-        """Danger: If the box defines a set in the SS, this function may
-        change the shape and size of such set. This deformation can be
-        corrected by executing 'box.recenter_in_TS(zeros(box.ts_dimention))'.
-        For a safer recentering, use 'recenter_in_SS'.
-        """
-        self.ts_center = np.array(new_center)
-        for boundary in self.constraints:
-            boundary.update(center=self.ts_center)
+    def apply_transforms(self, transforms: list[list[np.ndarray]]):
+        for ic in range(len(transforms)):
+            for il in range(len(transforms[ic])):
+                new_extrem = transforms[ic][il][self.naxes, self.naxes] * self.constraints[ic].extrem[il]
+                self.constraints[ic].update(extrem = new_extrem)
 
-    def recenter_in_SS(self, new_center):
-        c_shape = np.shape(new_center)
-        correct_forms = ((self.ss_dimention, self.ts_dimention), (self.ts_dimention,))
-        if c_shape not in correct_forms:
-            raise ValueError(
-                (
-                    "The 'new_center' must have {} "
-                    + "rows and {} columns, but its shape "
-                    + "is {}"
-                ).format(self.ss_dimention, self.ts_dimention, np.shape(new_center))
-            )
-        self.ss_center = np.array(new_center)
-        for boundary in self.constraints:
-            center = boundary.SS_to_TS(new_center)
-            boundary.update(center=center)
+                transforms[ic][il][self.naxes, self.naxes] = 1
+
+                new_arrow = np.ones(self.naxes + 1)
+                new_arrow[:self.naxes] = self.constraints[ic].arrow[il, :]
+                new_arrow = transforms[ic][il] @ new_arrow
+                self.constraints[ic].update(arrow = new_arrow[:self.naxes])
+
+                new_center = transforms[ic][il][:self.naxes, self.naxes] + self.constraints[ic].center[il, :]
+                self.constraints[ic].update(center = new_center)
+
+    def broadcast_uniform_transform(self, transform: np.ndarray):
+        transforms = [[]] * len(self.constraints)
+        for ic in range(len(self.constraints)):
+            for il in range(len(self.constraints[ic].nlines)):
+                transforms[ic].append(transform)
+        return transforms
+
+    def broadcast_nlines_transforms(self, transforms: list[np.ndarray]):
+        return ([transforms] * len(self.constraints))
+
+    def broadcast_uniform_translation(self, translation: np.ndarray, space: SPACE):
+        if (space == SPACE.TS):
+            transform = np.eye(self.naxes+1, self.naxes+1)
+            transform[:self.naxes, self.naxes] = translation
+            return self.broadcast_uniform_transform(transform)
+        else:
+            transforms = [[]] * len(self.constraints)
+            for ic in range(len(self.constraints)):
+                for il in range(len(self.constraints[ic].nlines)):
+                    transform = np.eye(self.naxes+1, self.naxes+1)
+                    transform[:self.naxes, self.naxes] = self.constraints[ic].SS_to_TS(translation)
+                    transforms[ic].append(transform)
+            return transforms
+
+    def broadcast_nlines_translations(self, translations: list[np.ndarray], space: SPACE):
+        if (space == SPACE.TS):
+            transforms = [[]] * len(translations)
+            for i in range(len(translations)):
+                transforms[i] = np.eye(self.naxes+1, self.naxes+1)
+                transforms[i][:self.naxes, self.naxes] = translations[i]
+            return self.broadcast_nlines_transforms(transforms)
+        else:
+            transforms = [[]] * len(self.constraints)
+            for ic in range(len(self.constraints)):
+                for il in range(len(self.constraints[ic].nlines)):
+                    transform = np.eye(self.naxes+1, self.naxes+1)
+                    transform[:self.naxes, self.naxes] = self.constraints[ic].SS_to_TS(translations[il])
+                    transforms[ic].append(transform)
+            return transforms
+
+    def broadcast_uniform_rotation(self, rotation: np.ndarray, space: SPACE):
+        if (space == SPACE.TS):
+            transform = np.eye(self.naxes+1, self.naxes+1)
+            transform[:self.naxes, :self.naxes] = rotation
+            return self.broadcast_uniform_transform(transform)
+        else:
+            print("Using SS rotations on a box is not implemented")
+            return []
+
+    def broadcast_nlines_rotations(self, rotations: list[np.ndarray], space: SPACE):
+        if (space == SPACE.TS):
+            transforms = [[]] * len(rotations)
+            for i in range(len(rotations)):
+                transform = np.eye(self.naxes+1, self.naxes+1)
+                transform[:self.naxes, :self.naxes] = rotations[i]
+                transforms[i] = transform
+            return self.broadcast_nlines_transforms(transforms)
+        else:
+            print("Using SS rotations on a box is not implemented")
+            return []
+
+    def broadcast_uniform_rotation(self, rotation: np.ndarray, rotation_center: np.ndarray, space: SPACE):
+        if (space == SPACE.TS):
+            rotation_transform = np.eye(self.naxes+1, self.naxes+1)
+            rotation_transform[:self.naxes, :self.naxes] = rotation
+
+            first_translation_transform = np.eye(self.naxes+1, self.naxes+1)
+            first_translation_transform[:self.naxes, self.naxes] = -rotation_center
+            
+            second_translation_transform = np.eye(self.naxes+1, self.naxes+1)
+            second_translation_transform[:self.naxes, self.naxes] = rotation_center
+
+            transform = second_translation_transform @ rotation_transform @ first_translation_transform
+
+            return self.broadcast_uniform_transform(transform)
+        else:
+            print("Using SS rotations on a box is not implemented")
+            return []
+
+    def broadcast_nlines_rotations(self, rotations: list[np.ndarray], rotation_centers: list[np.ndarray], space: SPACE):
+        if (space == SPACE.TS):
+            transforms = [[]] * len(rotations)
+            for i in range(len(rotations)):
+                rotation_transform = np.eye(self.naxes+1, self.naxes+1)
+                rotation_transform[:self.naxes, :self.naxes] = rotations[i]
+
+                first_translation_transform = np.eye(self.naxes+1, self.naxes+1)
+                first_translation_transform[:self.naxes, self.naxes] = -rotation_centers[i]
+                
+                second_translation_transform = np.eye(self.naxes+1, self.naxes+1)
+                second_translation_transform[:self.naxes, self.naxes] = rotation_centers[i]
+
+                transforms[i] = second_translation_transform @ rotation_transform @ first_translation_transform
+
+            return self.broadcast_nlines_transforms(transforms)
+        else:
+            print("Using SS rotations on a box is not implemented")
+            return []
+
+    def broadcast_uniform_scale(self, scale: float):
+        transform = np.eye(self.naxes+1, self.naxes+1)
+        transform[self.naxes, self.naxes] = scale
+        return self.broadcast_uniform_transform(transform)
+
+    def broadcast_nlines_scales(self, scales: list[float]):
+        transforms = [np.eye(self.naxes+1, self.naxes+1)] * len(scales)
+        for i in range(len(scales)):
+            transforms[i][self.naxes, self.naxes] = scales[i]
+        return self.broadcast_nlines_transforms(transforms)
+        
+    def set_uniform_position(self, position: np.ndarray):
+        for ic in range(len(self.constraints)):
+            for il in range(len(self.constraints[ic].nlines)):
+                self.constraints[ic].update(center = position)
+
+    def set_nlines_position(self, positions: list[np.ndarray]):
+        for ic in range(len(self.constraints)):
+            for il in range(len(self.constraints[ic].nlines)):
+                self.constraints[ic].update(center = positions[il])
+
+    def broadcast_uniform_safety_margin(self, margin: float):
+        transforms = [[]] * len(self.constraints)
+        for ic in range(len(self.constraints)):
+            for il in range(len(self.constraints[ic].nlines)):
+                scale = 1 + (self.constraints[ic].extrem / margin)
+                transform = np.eye(self.naxes+1, self.naxes+1)
+                transform[self.naxes, self.naxes] = scale
+                transforms[ic].append(transform)
+        return transforms
+
+    def broadcast_nlines_safety_margin(self, margins: list[float]):
+        transforms = [[]] * len(self.constraints)
+        for ic in range(len(self.constraints)):
+            for il in range(len(self.constraints[ic].nlines)):
+                scale = 1 + (self.constraints[ic].extrem / margins[il])
+                transform = np.eye(self.naxes+1, self.naxes+1)
+                transform[self.naxes, self.naxes] = scale
+                transforms[ic].append(transform)
+        return transforms
 
     def reschedule(self, new_schedule):
         self.schedule = new_schedule
         for boundary in self.constraints:
             boundary.update(schedule=self.schedule)
-
-    def translate_in_TS(self, translation):
-        self.ts_center += translation
-        for boundary in self.constraints:
-            new_center = boundary.center + translation
-            boundary.update(center=new_center)
-
-    def translate_in_SS(self, translation):
-        c_shape = np.shape(translation)
-        correct_forms = ((self.ss_dimention, self.ts_dimention), (self.ts_dimention,))
-        if c_shape not in correct_forms:
-            raise ValueError(
-                (
-                    "The 'new_center' must have {} "
-                    + "rows and {} columns, but its shape "
-                    + "is {}"
-                ).format(self.ss_dimention, self.ts_dimention, np.shape(translation))
-            )
-        self.ss_center += np.array(translation)
-        for boundary in self.constraints:
-            center = boundary.center + boundary.SS_to_TS(translation)
-            boundary.update(center=center)
-
-    def rotate_in_TS(self, rotations):
-        nlines = self.constraints[0].nlines
-        N = 1 if nlines is None else nlines
-
-        if not isinstance(rotations, list):
-            rotations = [rotations] * N
-
-        if len(rotations) != N and len(rotations) != 1:
-            raise IndexError(
-                "'rotations' must contain 1 or {} rotation matrices".format(N)
-            )
-
-        if len(rotations) == 1:
-            rotations *= N
-
-        for boundary in self.constraints:
-            arrows = boundary.arrow
-
-            if arrows.shape[0] == 1 and N > 1:
-                arrows = np.resize(arrows, (N, boundary.axes_len))
-
-            new_arrows = [n @ R.T for R, n in zip(rotations, arrows)]
-            boundary.update(arrow=np.vstack(new_arrows))
-
-        # #TODO: Would it be needed to make an accumulation of rotations along the
-        # horizon?  or it is correct as it is now?
-
-    def rotate_in_SS(self, rotations):
-        raise NotImplementedError("Maybe later.")
 
     def is_feasible(self, points, space="SS"):
         if not isinstance(points, list):
@@ -546,20 +593,6 @@ class Box:
                 all([limit.is_feasible(point, space) for limit in self.constraints])
             )
         return feasible
-
-    def scale_box(self, scale_factor):
-
-        for boundary in self.constraints:
-            boundary.update(extreme=boundary.extreme * scale_factor / self.scale_factor)
-        self.scale_factor = scale_factor
-
-    def set_safety_margin(self, margin):
-
-        for boundary in self.constraints:
-            boundary.update(
-                extreme=boundary.extreme - margin * np.linalg.norm(boundary.arrow)
-            )
-        self.safety_margin = margin
 
     def update(self, **kargs):
         self.__figuring_out(self, **kargs)
