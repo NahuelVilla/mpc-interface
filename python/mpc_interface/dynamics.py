@@ -25,7 +25,10 @@ class to define ExtendedSystems:
 
 """
 
-
+## TODO: DomainVariable and ExtendedSystem should be more compatible, Maybe implementations of
+##       the same abstract class.
+## TODO: It should be much easier to access the inputs and states with their sizes, and IDs.
+##       maybe add an input_ID (as state_ID)
 class DomainVariable:
     def __init__(
         self, names, sizes, axes=None, time_variant=False, how_to_update_size=None
@@ -149,7 +152,7 @@ class ExtendedSystem:
         S : ndarray with shape [N, n, n],
         U : list of m ndarrays with shape [N, p_u, n]
 
-        with dimentins N horizon lenght, n number of states, m number of inputs
+        with dimentins N horizon length, n number of states, m number of inputs
         and p_u the number of actions predicted for each input.
 
         When the number of inputs is 1 a ndarray is admited for U instead
@@ -214,9 +217,9 @@ class ExtendedSystem:
             self.__figuring_out = how_to_update_matrices
 
     @classmethod
-    def from_control_system(cls, control_system, state_vector_name, horizon_lenght):
+    def from_control_system(cls, control_system, state_vector_name, horizon_length):
 
-        S, U = use.extend_matrices(horizon_lenght, control_system.A, control_system.B)
+        S, U = use.extend_matrices(horizon_length, control_system.A, control_system.B)
         if control_system.time_variant:
 
             def how_to_update_matrices(ext_syst, **kargs):
@@ -227,7 +230,7 @@ class ExtendedSystem:
                 ctr_syst = kargs["control_system"]
                 ctr_syst.update_matrices(**kargs)
 
-                S, U = use.extend_matrices(horizon_lenght, ctr_syst.A, ctr_syst.B)
+                S, U = use.extend_matrices(horizon_length, ctr_syst.A, ctr_syst.B)
                 ext_syst.matrices = U + [S]
 
         else:
@@ -272,7 +275,7 @@ class ExtendedSystem:
                 self.domain[variable] = self.matrices[ID].shape[1]
 
             self.all_variables.update(self.domain)
-        # the state sizes (correspondig to the horizon lenght) are constant.
+        # the state sizes (correspondig to the horizon length) are constant.
 
     def make_definitions(self):
         for variable, size in self.domain.items():

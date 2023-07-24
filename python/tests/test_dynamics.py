@@ -145,7 +145,7 @@ class DynamicsTestCase(unittest.TestCase):
         )
 
         extended_LIP = dy.ExtendedSystem.from_control_system(
-            LIP, state_vector_name="x", horizon_lenght=36
+            LIP, state_vector_name="x", horizon_length=36
         )
 
         self.assertTrue(np.isclose(extended_LIP.matrices[0], saved_matrices[0]).all())

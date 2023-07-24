@@ -264,6 +264,7 @@ class Formulation:
         return A, h
 
     def generate_qp_cost(self, cost, given):
+        #TODO: set always Q as a symetrix matrix. In principle 0.5 * (Q+Q.T)
 
         Q = np.zeros([self.optim_len, self.optim_len])
         q = np.zeros([self.optim_len, 1])
@@ -293,8 +294,8 @@ class Formulation:
             q += (
                 cost.weight
                 * (
-                    vMo.T @ (cMg @ given - cost.cross_aim[:, i])
-                    + cMo.T @ (vMg @ given - cost.aim[:, i])
+                    vMo.T @ (cMg @ given - cost.cross_aim[:, i, None])
+                    + cMo.T @ (vMg @ given - cost.aim[:, i, None])
                 )
                 / 2
             )

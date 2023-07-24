@@ -103,6 +103,18 @@ class Cost:
             )
         return arranged_L
 
+    def recede_aim(self, aim=None):
+        """ This method assumes that aim has the correct amount of lines"""
+
+        if aim is None:
+            self.aim = np.vstack([self.aim[1:, :], self.aim[-1, :]])
+            if not self.crossed:
+                self.cross_aim = self.aim
+        else:
+            self.aim = np.vstack([self.aim[1:, :], aim.reshape([-1, self.axes_len])[-1, :]])
+            if not self.crossed:
+                self.cross_aim = self.aim
+
     def update(
         self, aim=None, weight=None, L=None, schedule=None, cross_aim=None, cross_L=None
     ):
