@@ -46,7 +46,7 @@ def formulate_biped(conf):
 
     # #~LIP~##
     LIP = ControlSystem.from_name(system, axes, tau=conf.mpc_period, omega=w)
-    LIP_ext = ExtendedSystem.from_cotrol_system(LIP, "x", horizon_lenght)
+    LIP_ext = ExtendedSystem.from_control_system(LIP, "x", horizon_lenght)
 
     # #~Non-Linearity~##
     bias = DomainVariable("n", horizon_lenght, axes)
