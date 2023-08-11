@@ -12,6 +12,7 @@ from enum import Enum
 
 # # TODO: make some visualization of the constraints graphically
 
+## TODO IDEA: don't use enums, pass as string, or in csae, put enum inside the class
 class SPACE(Enum):
     TS = 1
     SS = 2    
@@ -19,7 +20,7 @@ class SPACE(Enum):
 class Constraint:
     def __init__(
         self,
-        variable,
+        variable_name,
         extreme,
         axes=None,
         arrow=None,
@@ -59,13 +60,14 @@ class Constraint:
 
         based on the variable_in v = [v_x, v_y] which is defined by 'variable' and 'axes'.
         """
-        self.variable = variable
+        self.variable_name = variable_name 
         self.axes = [""] if axes is None else axes
         if not isinstance(self.axes, list):
             raise TypeError("The axes must be a list of string")
         self.axes_len = len(self.axes)
 
         self.schedule = range(0) if schedule is None else schedule
+
         if L is None:
             self.L = []
         else:
@@ -91,11 +93,8 @@ class Constraint:
             self.L[i] = sl if len(L.shape)-1 else sl[None, :]
             if self.schedule and sl.shape[-1] != self.t:
                 raise ValueError(
-                "arrays in L must have {} ".format(self.t)
-                + "columns, which is given by the 'schedule'."
+                "arrays in L must have {} columns, which is given by the 'schedule'.".format(self.t)
                 )
-
-
 
     #    if self.schedule and np.any([sl.shape[-1] != self.t for sl in self.L]):
     #        raise ValueError(
@@ -304,7 +303,7 @@ class Constraint:
         else:
             axes = ""
 
-        text = "\nvariable: " + self.variable + axes
+        text = "\n\tvariable name: " + self.variable_name + axes
         text += (
             "\nwith L = " + str(",\n".join(str(ll) for ll in self.L))
             if self.L != []
@@ -339,7 +338,7 @@ class Box:
     @classmethod
     def task_space(
         cls,
-        variable,
+        variable_name,
         vertices,
         axes=None,
         L=None,
@@ -347,21 +346,23 @@ class Box:
         time_variant=None,
         how_to_update=None,
     ):
-
         box = cls(time_variant, how_to_update)
+        axes = [""] if axes is None else axes
+        if not isinstance(axes, list): #CHECK
+            raise TypeError("The axes must be a list of string")
         box.naxes = len(axes)
 
         arrows, extremes, center = box_boundaries(vertices)
         for i, extreme in enumerate(extremes):
             box.constraints.append(
-                Constraint(variable, extreme, axes, arrows[i], center, L, schedule)
+                Constraint(variable_name, extreme, axes, arrows[i], center, L, schedule)
             )
         return box
 
     @classmethod
     def state_space(
         cls,
-        variable,
+        variable_name,
         vertices,
         axes=None,
         schedule=None,
@@ -370,6 +371,9 @@ class Box:
     ):
 
         box = cls(time_variant, how_to_update)
+        axes = [""] if axes is None else axes
+        if not isinstance(axes, list): #CHECK
+            raise TypeError("The axes must be a list of string")
         box.naxes = len(axes)
 
         arrows_SS, extremes_SS, center_SS = box_boundaries(vertices)
@@ -378,7 +382,7 @@ class Box:
         for i, extreme in enumerate(extremes_SS):
             box.constraints.append(
                 Constraint(
-                    variable,
+                    variable_name,
                     extreme,
                     axes=axes,
                     center=center[i],
@@ -395,7 +399,7 @@ class Box:
     @classmethod
     def task_space_exterior(
         cls,
-        variables,
+        variables_name,
         vertices,
         center=None,
         axes=None,
@@ -406,7 +410,12 @@ class Box:
     ):
 
         box = cls(time_variant, how_to_update)
+        
+        axes = [""] if axes is None else axes
+        if not isinstance(axes, list): #CHECK
+            raise TypeError("The axes must be a list of string")
         box.naxes = len(axes)
+        
         if center is None:
             center = np.array([0, 0])
 
@@ -414,10 +423,10 @@ class Box:
 
         for i, couple in enumerate(simplices):
             box.constraints.append(
-                Constraint(variables[couple[0]], extremes[i], axes, arrows[i], center, L, schedule)
+                Constraint(variables_name[couple[0]], extremes[i], axes, arrows[i], center, L, schedule)
             )
             box.constraints.append(
-                Constraint(variables[couple[1]], extremes[i], axes, arrows[i], center, L, schedule)
+                Constraint(variables_name[couple[1]], extremes[i], axes, arrows[i], center, L, schedule)
             )
 
         return box
@@ -425,8 +434,8 @@ class Box:
     def apply_transforms(self, transforms: list[list[np.ndarray]]):
         for ic in range(len(transforms)):
             for il in range(len(transforms[ic])):
-                new_extrem = transforms[ic][il][self.naxes, self.naxes] * self.constraints[ic].extrem[il]
-                self.constraints[ic].update(extrem = new_extrem)
+                new_extrem = transforms[ic][il][self.naxes, self.naxes] * self.constraints[ic].extreme[il]
+                self.constraints[ic].update(extreme = new_extrem)
 
                 transforms[ic][il][self.naxes, self.naxes] = 1
 
@@ -440,8 +449,9 @@ class Box:
 
     def broadcast_uniform_transform(self, transform: np.ndarray):
         transforms = [[]] * len(self.constraints)
+        # TODO: nlines can't be NONE or non-int  
         for ic in range(len(self.constraints)):
-            for il in range(len(self.constraints[ic].nlines)):
+            for il in range(self.constraints[ic].nlines):
                 transforms[ic].append(transform)
         return transforms
 
@@ -456,7 +466,7 @@ class Box:
         else:
             transforms = [[]] * len(self.constraints)
             for ic in range(len(self.constraints)):
-                for il in range(len(self.constraints[ic].nlines)):
+                for il in range(self.constraints[ic].nlines):
                     transform = np.eye(self.naxes+1, self.naxes+1)
                     transform[:self.naxes, self.naxes] = self.constraints[ic].SS_to_TS(translation)
                     transforms[ic].append(transform)
@@ -472,7 +482,7 @@ class Box:
         else:
             transforms = [[]] * len(self.constraints)
             for ic in range(len(self.constraints)):
-                for il in range(len(self.constraints[ic].nlines)):
+                for il in range(self.constraints[ic].nlines):
                     transform = np.eye(self.naxes+1, self.naxes+1)
                     transform[:self.naxes, self.naxes] = self.constraints[ic].SS_to_TS(translations[il])
                     transforms[ic].append(transform)
@@ -555,7 +565,7 @@ class Box:
 
     def set_nlines_position(self, positions: list[np.ndarray]):
         for ic in range(len(self.constraints)):
-            for il in range(len(self.constraints[ic].nlines)):
+            for il in range(self.constraints[ic].nlines):
                 self.constraints[ic].update(center = positions[il])
 
     def broadcast_uniform_safety_margin(self, margin: float):
@@ -571,7 +581,7 @@ class Box:
     def broadcast_nlines_safety_margin(self, margins: list[float]):
         transforms = [[]] * len(self.constraints)
         for ic in range(len(self.constraints)):
-            for il in range(len(self.constraints[ic].nlines)):
+            for il in range(self.constraints[ic].nlines):
                 scale = 1 + (self.constraints[ic].extrem / margins[il])
                 transform = np.eye(self.naxes+1, self.naxes+1)
                 transform[self.naxes, self.naxes] = scale
