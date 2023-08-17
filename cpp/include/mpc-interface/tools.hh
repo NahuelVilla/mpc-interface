@@ -5,6 +5,10 @@
 /// Date: 2022
 ///
 ///
+/// Author2: David Bellis
+/// Copyright2: Nimble One
+/// Date2: Aug 2023
+///
 
 #include <Eigen/Eigen>
 
@@ -18,12 +22,27 @@
 
 #include <unsupported/Eigen/CXX11/Tensor>
 
+#include <mpc-interface/dynamics.hh>
+
 namespace gecko {
 namespace tools {
 
 void extend_matrices(Eigen::Tensor<double, 3> &S, Eigen::Tensor<double, 4> &U,
-                     unsigned int N, Eigen::MatrixXd &A, Eigen::MatrixXd &B);
+                     unsigned int N, Eigen::MatrixXd *A, Eigen::MatrixXd *B);
 
+
+void update_step_matrices(
+  void ** objects,
+  std::map<std::string, double> & kargs);
+
+inline void do_not_update(
+  void ** objects,
+  std::map<std::string, double> & kargs)
+{
+    (void)objects;
+    (void)kargs;
 }
 
-}  // namespace gecko
+} // namespace tools
+
+} // namespace gecko

@@ -19,6 +19,8 @@ import mpc_interface.dynamics as dy
 import mpc_interface.tools as use
 import pickle
 
+# the Agent helps us run tests
+from testAgent import *
 
 class DynamicsTestCase(unittest.TestCase):
     def setUp(self):
@@ -32,6 +34,9 @@ class DynamicsTestCase(unittest.TestCase):
         A[:-1, 1:] = np.eye(7)
 
         B = np.ones([8, 6])
+
+        write_output("output/test_control_system_A0.op", get_output_2d(A))
+        write_output("output/test_control_system_B0.op", get_output_2d(B))
 
         axes = ["_x", "_y", "_z", "_a", "_b"]
 
@@ -79,6 +84,9 @@ class DynamicsTestCase(unittest.TestCase):
         self.ext_sys3 = ext_sys3
         self.N = horizon_lenght
 
+        write_output("output/test_control_system_A1.op", get_output_2d(cnt_sys1.A))
+        write_output("output/test_control_system_B1.op", get_output_2d(cnt_sys1.B))
+
         # #### Settings for single variable
         def in_this_way(singVar, **kargs):
             if isinstance(kargs["new_sizes"], Iterable):
@@ -114,12 +122,18 @@ class DynamicsTestCase(unittest.TestCase):
         self.assertTrue((self.cnt_sys3.A == self.A).all())
         self.assertTrue((self.cnt_sys1.B == self.B).all())
 
+        write_output("output/test_control_system_B_before_control.op", get_output_2d(self.cnt_sys1.B))
+
         self.cnt_sys1.update_matrices(factor=3)
         self.cnt_sys2.update_matrices(factor=3)
         self.cnt_sys3.update_matrices(factor=3)
 
         correct_new_B_1 = 3 * np.ones([8, 6])
         correct_new_B_1[-1] = 24
+
+        write_output("output/test_control_system_A_after_control.op", get_output_2d(self.cnt_sys1.A))
+        write_output("output/test_control_system_B_after_control.op", get_output_2d(self.cnt_sys1.B))
+        write_output("output/test_control_system_correct_new_B_1.op", get_output_2d(correct_new_B_1))
 
         self.assertTrue((self.cnt_sys1.B == correct_new_B_1).all())
         self.assertTrue((self.cnt_sys2.B == self.B).all())

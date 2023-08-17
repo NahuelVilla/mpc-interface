@@ -3,7 +3,7 @@
 # Specify sources
 set(${PROJECT_NAME}_HEADERS include/${PROJECT_NAME}/dynamics.hh
                             include/${PROJECT_NAME}/tools.hh)
-set(${PROJECT_NAME}_SOURCES src/dynamics.cc src/tools.cc)
+set(${PROJECT_NAME}_SOURCES src/combinations.cc src/dynamics.cc src/tools.cc)
 
 # Create library
 add_library(${PROJECT_NAME} SHARED ${${PROJECT_NAME}_HEADERS}

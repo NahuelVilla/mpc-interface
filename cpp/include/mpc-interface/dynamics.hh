@@ -5,6 +5,10 @@
 /// Date: 2022
 ///
 ///
+/// Author2: David Bellis
+/// Copyright2: Nimble One
+/// Date2: Aug 2023
+///
 
 #ifndef GECKO_DYNAMICS_H_
 #define GECKO_DYNAMICS_H_
@@ -23,28 +27,110 @@
 
 #include <unsupported/Eigen/CXX11/Tensor>
 
+#include <mpc-interface/combinations.hh>
+
 namespace gecko {
 namespace tools {
 
+class DomainVariable
+{
+public:
+  /// Constructor
+  DomainVariable();
+
+  void init(
+    std::vector<std::string> & names,
+    std::vector<int> & sizes,
+    std::vector<std::string> & axes,
+    bool time_variant,
+    std::function<void(
+      void ** objects,
+      std::map<std::string, double> & kargs
+    )> how_to_update_size
+  );
+
+  void __figuring_out(
+    void ** objects,
+    std::map<std::string, double> & kargs
+  );
+
+  void identify_domain(std::vector<std::string> & names);
+  void set_sizes(std::vector<std::string> & names, std::vector<int> & sizes);
+  void update_sizes(std::map<std::string, double> & kargs);
+  void make_definitions();
+  void define_output(
+    std::string & name,
+    std::map<std::string, int> & combination,
+    bool time_variant,
+    std::function<void(
+      void ** objects,
+      std::map<std::string, double> & kargs
+    )> how_to_update
+  );
+  void update_definitions();
+  void update(std::map<std::string, double> & kargs);
+
+private:
+  std::vector<std::string> names_;
+  std::vector<int> sizes_;
+  std::vector<std::string> axes_;
+
+  bool time_variant_;
+  std::function<void(
+    void ** objects,
+    std::map<std::string, double> & kargs
+  )> how_to_update_size_;
+
+  std::map<std::string, int> domain_ID;
+  std::map<std::string, int> domain;
+  std::map<std::string, int> all_variables;
+  std::map<std::string, LineCombo> definitions;
+  std::vector<std::string> outputs;
+};
+
 /// *{
+/// \class ExtendenSystem
+/// This class works a dynamics of the form:
+/// \$ x = S*x0 + U*u \$
+/// where
+/// S: is a 3d tensor of shape \$ [N,n,n] \$.
+/// U: is a 4d tensor of shpae \$ [m,N,N,n] \$.
+/// with \$ N\$ the horizon length, \$ n\$ the number of states,
+/// \$ m \$ number of inputs and \$ p_u \$ the number of ctions predicted
+/// for each input.
 /// *}
 
-class ExtendedSystem;
-
 class ControlSystem {
- public:
-  ControlSystem(std::vector<std::string> &input_names,
-                std::vector<std::string> &state_names, Eigen::MatrixXd &A,
-                Eigen::MatrixXd &B, std::vector<std::string> &axes,
-                std::function<void(std::shared_ptr<ExtendedSystem> shr_ext_sys,
-                                   std::map<std::string, int> &kargs)>
-                    how_to_update_matrices,
-                bool time_variant = false);
+public:
+  ControlSystem(
+    Eigen::MatrixXd *A, Eigen::MatrixXd *B
+  );
 
-  void update_matrices(std::shared_ptr<ExtendedSystem> shr_ext_sys,
-                       std::map<std::string, int> &kargs);
+  void init(
+    std::vector<std::string> &input_names,
+    std::vector<std::string> &state_names,
+    Eigen::MatrixXd *A, Eigen::MatrixXd *B,
+    std::vector<std::string> &axes,
+    bool time_variant,
+    std::function<void(
+      void ** objects,
+      std::map<std::string, double> & kargs
+    )> how_to_update_matrices
+  );
 
- protected:
+  void update_matrices(
+    void ** objects,
+    std::map<std::string, double> & kargs);
+
+  /// getters
+  std::vector<std::string> & get_input_names();
+  std::vector<std::string> & get_state_names();
+  Eigen::MatrixXd * get_matrix_A();
+  Eigen::MatrixXd * get_matrix_B();
+  std::vector<std::string> & get_axes();
+  bool is_time_variant();
+
+private:
   /// Store the names of the inputs
   std::vector<std::string> input_names_;
 
@@ -62,40 +148,51 @@ class ControlSystem {
   /// Is the system time variant ?
   bool time_variant_;
 
-  /// Ref to method to call
-  std::function<void(std::shared_ptr<ExtendedSystem> shr_ext_sys,
-                     std::map<std::string, int> &kargs)>
-      how_to_update_matrices_;
+  /// Ref to callback method
+  std::function<void(
+    void ** objects,
+    std::map<std::string, double> & kargs
+  )> how_to_update_matrices_;
 };
-/// *{
-/// \class ExtendenSystem
-/// This class works a dynamics of the form:
-/// \$ x = S*x0 + U*u \$
-/// where
-/// S: is a 3d tensor of shape \$ [N,n,n] \$.
-/// U: is a 4d tensor of shpae \$ [m,N,N,n] \$.
-/// with \$ N\$ the horizon length, \$ n\$ the number of states,
-/// \$ m \$ number of inputs and \$ p_u \$ the number of ctions predicted
-/// for each input.
-/// *}
 
 class ExtendedSystem {
- public:
+public:
   /// Constructor
-  ExtendedSystem(
-      std::vector<std::string> &input_names,
-      std::vector<std::string> &state_names, std::string &state_vector_name,
-      Eigen::Tensor<double, 3> S, Eigen::Tensor<double, 4> U,
-      std::vector<std::string> &axis,
-      std::function<void(Eigen::Tensor<double, 3> &, Eigen::Tensor<double, 4> &,
-                         unsigned int, Eigen::MatrixXd &, Eigen::MatrixXd &)>
-          how_to_update_ext_matrices,
-      bool time_variant = true);
+  ExtendedSystem();
+
+  void init(
+    std::vector<std::string> &input_names,
+    std::vector<std::string> &state_names,
+    std::string &state_vector_name,
+    std::vector<std::string> &axes,
+    bool time_variant,
+    std::function<void(
+      void ** objects,
+      std::map<std::string, double> & kargs
+    )> how_to_update_matrices
+  );
+
+  void init_from_control_system(
+    ControlSystem * control_system,
+    std::string state_vector_name,
+    unsigned int horizon_length
+  );
 
   void identify_domain(std::vector<std::string> &input_name,
                        std::vector<std::string> &state_names);
 
- protected:
+  /// getters
+  Eigen::Tensor<double, 3> & get_S();
+  Eigen::Tensor<double, 4> & get_U();
+  int get_horizon_length();
+
+   /// TODO ? Change the name of set_sizes
+  void set_sizes();
+
+  /// TODO:
+  void update_sizes();
+
+private:
   /// Store the list of axis.
   std::vector<std::string> axis_;
 
@@ -112,7 +209,7 @@ class ExtendedSystem {
   /// State related matrix
   Eigen::Tensor<double, 3> S_;
 
-  /// Command related matrixo
+  /// Command related matrix
   Eigen::Tensor<double, 4> U_;
 
   /// Domain ID
@@ -127,22 +224,20 @@ class ExtendedSystem {
   /// List of axis in the model
   std::vector<std::string> axes_;
 
+  /// Matrices is a tuple of tensors
+  //std::tuple<Eigen::Tensor<double, 4> &, Eigen::Tensor<double, 3> &> matrices_;
+
+  /// Horizon Length
+  int horizon_length_;
+
   /// Is the system time variant ?
   bool time_variant_;
 
-  /// Matrices is a tuple of tensors
-  std::tuple<Eigen::Tensor<double, 4> &, Eigen::Tensor<double, 3> &> matrices_;
-
-  std::function<void(Eigen::Tensor<double, 3> &A, Eigen::Tensor<double, 4> &B,
-                     unsigned int, Eigen::MatrixXd &, Eigen::MatrixXd &)>
-      how_to_update_ext_matrices_;
-
-  /// Populate the all_variables member.
-  /// TODO ? Change the name of set_sizes
-  void set_sizes();
-
-  /// TODO:
-  void update_sizes();
+  /// Ref to callback method
+  std::function<void(
+    void ** objects,
+    std::map<std::string, double> & kargs
+  )> how_to_update_matrices_;
 };
 
 }  // namespace tools

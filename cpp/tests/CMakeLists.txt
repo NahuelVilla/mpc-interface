@@ -8,4 +8,5 @@ macro(ADD_QP_FORMULATIONS_UNIT_TEST NAME)
                          "-DBOOST_TEST_MODULE=${MODULE_NAME}")
 endmacro(ADD_QP_FORMULATIONS_UNIT_TEST)
 
+add_qp_formulations_unit_test(dynamics)
 add_qp_formulations_unit_test(tools)
