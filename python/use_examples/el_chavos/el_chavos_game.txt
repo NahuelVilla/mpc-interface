@@ -1,0 +1,44 @@
+"El Chavo del 8" is a popular and well-loved American character who enjoys balancing things:
+
+https://www.dropbox.com/scl/fi/2o38p5u15f8wwyi2gw7h0/Chavo_balancing.jpg?rlkey=2kumz7fhs5iyusv3vu1173prq&dl=0
+
+Let's balance the broom by controlling Chavo's foot with MPC !
+
+
+
+We consider only the horizontal plane xy. and we will assume that Chavo's foot is always maintained at the same height.
+
+We will model the Center of Mass (CoM) of the broom by the dynamics of a linear inverted pendulum:
+
+		ddc = w^2 (c - p) 				[eq. 1]
+
+Where the acceleration of the center of mass ddc depends on a time constant w and the distance from the CoM c to Chavo's foot p.
+
+The time constant depends on the hight of the CoM c_z and the gravity g:
+
+			w^2 = g / c_z 				[eq. 2]
+
+1) Estimate a value for c_z based on a standard broom
+
+2) Create the CoM dynamics using the System called "J->CCC". This system assumes that the user will provide arbitrary values to the CoM Jerk (said, the Jerk is the control variable) and it generates accordingly the position, velocity, and acceleration.
+
+3) Extend the control system to predict its dynamics along an horizon of 3 seconds in the future. Consider a discretization period of 0.1 seconds.
+
+4) The approximation of linear inverted pendulum is valid only for small distances c-p in the horizontal plane xy. So, we would like to make a constraint that maintains the CoM within a circle around Chavo's foot. In order to do it, use the eq. 1 to define Chavo's foot and also define the distance c-p.
+
+Our MPC will work with a QP solver. This kind of solver only support linear constraints. So, we will approximate the circular constraint by a squared or hexagonal constraint.
+
+5) Set control objectives. Smooth motions are always welcome, we can achieve it by minimizing the jerk.
+
+   The goal in Chavo's game has several levels:
+
+   level 1) maintain a quiet sweeping action by looking to reach zero velocity of the CoM
+   level 2) move the broom with a constant velocity.
+   level 3) bring the broom to a specific place and stay there quiet.
+   level 4) move the broom with a sinusoidal velocity.
+
+6) Finally, The stability can be meaningfully improved by making the CoM “capturable” at the end of the horizon. This needs the “capture point” x to be exactly on Chavo's foot. The capture point is a linear combination of the CoM c and its velocity dc divided by the time constant w:
+
+				x = c + dc/w
+
+So, generate the necessary definitions and constraint the distance x-p to stay in a small set around zero.
