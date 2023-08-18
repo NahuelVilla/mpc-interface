@@ -19,7 +19,7 @@ w = np.sqrt(-gravity[2] / CoM_height)
 input_names = ["dddc"]
 state_names = ["c", "dc", "ddc"]
 axes = ["_x", "_y"]
-horizon_length = 3
+horizon_length = 60
 LIP = ControlSystem.from_name("J->CCC", input_names, state_names, axes, tau=0.1)
 LIP_ext = ExtendedSystem.from_control_system(LIP, "s", horizon_length)
 
@@ -54,8 +54,8 @@ bounding_box = Box.task_space(
 )
 
 # #COSTS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# zero_velocity_x = Cost("dc", 1, axes=["_x"])
-# zero_velocity_y = Cost("dc", 1, axes=["_y"])
+zero_pos_x = Cost("c", 1.7, axes=["_x"])
+zero_pos_y = Cost("c", .7, axes=["_y"])
 zero_acceleration_x = Cost("ddc", 1, axes=["_x"])
 zero_acceleration_y = Cost("ddc", 1, axes=["_y"])
 minimum_jerk = Cost("dddc", 0.001, axes=axes)
@@ -65,8 +65,8 @@ form = Formulation()
 form.incorporate_dynamics("broom", LIP_ext)
 form.incorporate_definitions(some_defs)
 form.incorporate_box("bounding_box", bounding_box)
-# form.incorporate_goal("zero_velocity_x", zero_velocity_x)
-# form.incorporate_goal("zero_velocity_y", zero_velocity_y)
+form.incorporate_goal("zero_pos_x", zero_pos_x)
+form.incorporate_goal("zero_pos_y", zero_pos_y)
 form.incorporate_goal("zero_acceleration_x", zero_acceleration_x)
 form.incorporate_goal("zero_acceleration_y", zero_acceleration_y)
 form.incorporate_goal("minimum_jerk", minimum_jerk)
@@ -76,8 +76,8 @@ form.make_preview_matrices()
 
 # Define the given values
 given_values = {
-    "s0_x": np.array([[0.0], [10.0], [0.3]]),
-    "s0_y": np.array([[0.0], [1.0], [0.2]])
+    "s0_x": np.array([[2.0], [5.0], [0.3]]),
+    "s0_y": np.array([[1.0], [1.0], [0.2]])
 }
 
 A, h, Q, q = form.generate_all_qp_matrices(form.arrange_given(given_values))
@@ -104,14 +104,14 @@ ddc_y = form.preview(form.arrange_given(given_values), X, "ddc_y")
 dddc_x = form.preview(form.arrange_given(given_values), X, "dddc_x")
 dddc_y = form.preview(form.arrange_given(given_values), X, "dddc_y")
 
-# plt.plot(time, c_x, label="c_x")
-# plt.plot(time, c_y, label="c_x")
+plt.plot(time, c_x, label="c_x")
+plt.plot(time, c_y, label="c_y")
 plt.plot(time, dc_x, label="dc_x")
 plt.plot(time, dc_y, label="dc_y")
 # plt.plot(time, ddc_x, label="ddc_x")
 # plt.plot(time, ddc_y, label="ddc_y")
-plt.plot(time, dddc_x, label="dddc_x")
-plt.plot(time, dddc_y, label="dddc_y")
+# plt.plot(time, dddc_x, label="dddc_x")
+# plt.plot(time, dddc_y, label="dddc_y")
 leg = plt.legend(loc='best')
 
 # plt.grid()
