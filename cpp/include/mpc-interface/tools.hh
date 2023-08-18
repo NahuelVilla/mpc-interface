@@ -1,5 +1,4 @@
 ///
-/// Gecko - Tools
 /// Author: Olivier Stasse
 /// Copyright: LAAS-CNRS
 /// Date: 2022
@@ -9,6 +8,7 @@
 /// Copyright2: Nimble One
 /// Date2: Aug 2023
 ///
+#pragma once
 
 #include <Eigen/Eigen>
 
@@ -24,25 +24,12 @@
 
 #include <mpc-interface/dynamics.hh>
 
-namespace gecko {
-namespace tools {
+namespace nimbleone {
+namespace mpc {
 
 void extend_matrices(Eigen::Tensor<double, 3> &S, Eigen::Tensor<double, 4> &U,
                      unsigned int N, Eigen::MatrixXd *A, Eigen::MatrixXd *B);
 
+} // namespace mpc
 
-void update_step_matrices(
-  void ** objects,
-  std::map<std::string, double> & kargs);
-
-inline void do_not_update(
-  void ** objects,
-  std::map<std::string, double> & kargs)
-{
-    (void)objects;
-    (void)kargs;
-}
-
-} // namespace tools
-
-} // namespace gecko
+} // namespace nimbleone

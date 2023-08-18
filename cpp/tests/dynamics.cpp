@@ -18,17 +18,8 @@ const int A_NUM_COLUMNS = 8;
 const int B_NUM_ROWS = 8;
 const int B_NUM_COLUMNS = 6;
 
-void how_to_update_control_system(
-  void ** objects,
-  std::map<std::string, double> & kargs)
-{
-    double factor = kargs["factor"];
-    gecko::tools::ControlSystem * cntS =
-      static_cast<gecko::tools::ControlSystem*>(objects[0]);
-    Eigen::MatrixXd newB =
-      *(cntS->get_matrix_A()) * *(cntS->get_matrix_B()) * factor;
-    *(cntS->get_matrix_B()) = newB;
-}
+void update_matrices_for_control_system(nimbleone::mpc::ControlSystem * cnt_sys, double factor);
+void update_matrices_for_extended_system(nimbleone::mpc::ControlSystem * cnt_sys, double factor, nimbleone::mpc::ExtendedSystem * ext_sys);
 
 struct dynamics_fixture
 {
@@ -67,9 +58,9 @@ struct dynamics_fixture
     write_output<Eigen::Matrix<double, Dynamic, Dynamic>>(
       "output/test_control_system_B0.oc", get_output(ssB0, B));
 
-    cnt_sys1.init(inputs, states, &A, &B, axes, true, how_to_update_control_system);
-    cnt_sys2.init(inputs, states, &A, &B, axes, false, how_to_update_control_system);
-    cnt_sys3.init(inputs, states, &A, &B, axes, true, gecko::tools::do_not_update);
+    cnt_sys1.init(inputs, states, &A, &B, axes);
+    cnt_sys2.init(inputs, states, &A, &B, axes);
+    cnt_sys3.init(inputs, states, &A, &B, axes);
 
     // Setting extended control systems
     ext_sys1.init_from_control_system(&cnt_sys1, "x", horizon_length);
@@ -97,15 +88,15 @@ struct dynamics_fixture
   Eigen::MatrixXd B;
   std::vector<std::string> axes;
   //
-  gecko::tools::ControlSystem cnt_sys1;
-  gecko::tools::ControlSystem cnt_sys2;
-  gecko::tools::ControlSystem cnt_sys3;
+  nimbleone::mpc::ControlSystem cnt_sys1;
+  nimbleone::mpc::ControlSystem cnt_sys2;
+  nimbleone::mpc::ControlSystem cnt_sys3;
 
   // Setting extended control systems
   int horizon_length;
-  gecko::tools::ExtendedSystem ext_sys1;
-  gecko::tools::ExtendedSystem ext_sys2;
-  gecko::tools::ExtendedSystem ext_sys3;
+  nimbleone::mpc::ExtendedSystem ext_sys1;
+  nimbleone::mpc::ExtendedSystem ext_sys2;
+  nimbleone::mpc::ExtendedSystem ext_sys3;
 
         // # #### Settings for single variable
         // def in_this_way(singVar, **kargs):
@@ -141,19 +132,14 @@ BOOST_FIXTURE_TEST_CASE(test_control_system, dynamics_fixture) {
   assert(cnt_sys1.get_state_names() == states);
   assert(cnt_sys2.get_input_names() == inputs);
 
-  std::map<std::string, double> kargs;
-  kargs.insert({"factor", 3.0});
-
   std::stringstream ssBb;
   write_output<Eigen::Matrix<double, Dynamic, Dynamic>>(
     "output/test_control_system_B_before_control.oc", get_output(ssBb, *(cnt_sys1.get_matrix_B())));
 
-  void *objects1[] =  { static_cast<void*>(&cnt_sys1) };
-  cnt_sys1.update_matrices(objects1, kargs);
-  void *objects2[] =  { static_cast<void*>(&cnt_sys2) };
-  cnt_sys2.update_matrices(objects2, kargs);
-  void *objects3[] =  { static_cast<void*>(&cnt_sys3) };
-  cnt_sys3.update_matrices(objects3, kargs);
+  double factor = 3.0;
+  update_matrices_for_control_system(&cnt_sys1, factor);
+  update_matrices_for_control_system(&cnt_sys2, factor);
+  update_matrices_for_control_system(&cnt_sys3, factor);
 
   Eigen::MatrixXd correct_new_B_1(B_NUM_ROWS, B_NUM_COLUMNS);
   for(int i = 0; i < B_NUM_ROWS; i++)
@@ -188,7 +174,22 @@ BOOST_FIXTURE_TEST_CASE(test_control_system, dynamics_fixture) {
 //   correctB = use.get_system_matrices("J->CCC")[1](tau=0.1, omega=3.5)
 
 //   assert(LIP.A == correctA).all())
-//   assert(LIP.B == correctB).all())
+//   assert(LIP.B == correctB).all()) double factor
 }
 
 BOOST_AUTO_TEST_SUITE_END()
+
+void update_matrices_for_control_system(nimbleone::mpc::ControlSystem * cnt_sys, double factor)
+{
+    Eigen::MatrixXd newB =
+      *(cnt_sys->get_matrix_A()) * *(cnt_sys->get_matrix_B()) * factor;
+    *(cnt_sys->get_matrix_B()) = newB;
+}
+
+void update_matrices_for_extended_system(nimbleone::mpc::ControlSystem * cnt_sys, double factor, nimbleone::mpc::ExtendedSystem * ext_sys)
+{
+  update_matrices_for_control_system(cnt_sys, factor);
+
+  nimbleone::mpc::extend_matrices(ext_sys->get_S(), ext_sys->get_U(), ext_sys->get_horizon_length(),
+    cnt_sys->get_matrix_A(), cnt_sys->get_matrix_B());
+}

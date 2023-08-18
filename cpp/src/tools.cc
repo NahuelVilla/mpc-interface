@@ -1,5 +1,4 @@
 ///
-/// Gecko - Tools
 /// Author: Olivier Stasse
 /// Copyright: LAAS-CNRS
 /// Date: 2022
@@ -20,8 +19,8 @@
 // This repository includes
 #include <mpc-interface/tools.hh>
 
-namespace gecko {
-namespace tools {
+namespace nimbleone {
+namespace mpc {
 
 using namespace Eigen;
 
@@ -101,53 +100,6 @@ void extend_matrices(Eigen::Tensor<double, 3> &S, Eigen::Tensor<double, 4> &U,
         for (Index l = 0; l < n; l++) U(j, lU_i, k, l) = u(i + l, k, j);
 }
 
-void update_step_matrices(std::shared_ptr<ExtendedSystem> /*shr_ext_sys*/,
-                          std::map<std::string, double> & /*kargs*/) {
-  /*This function needs
-    count : int, representing the current time sample number
-    and one of the following:
-      step_times : ndarray or list with next step times.
-    or
-      regular_time : int, to produce steps regularly
-  */
-/*
-  auto matrices = shr_ext_sys->get_matrices();
-  auto S = std::get<1>(matrices);
-  unsigned int N = S.dimension(0);
-
-  double count = 0;
-  if (auto search = kargs.find("count"); search != kargs.end())
-    count = search->second;
-
-
-    if "step_times" in kargs.keys():
-        step_times = kargs["step_times"]
-        regular_time = None
-
-    elif "regular_time" in kargs.keys():
-        regular_time = kargs["regular_time"]
-        step_times = None
-
-    else:
-        raise KeyError(
-            "This funtion needs either 'step_times' or "
-            + "'regular_time', but the kargs "
-            + "introduced are {}".format(kargs.keys())
-        )
-
-    if "w_phase" in kargs.keys():
-        walking_phase = kargs["w_phase"]
-    else:
-        walking_phase = 0
-
-    U = plan_steps(N, count, step_times, regular_time, walking_phase)
-    extSyst.matrices[0] = U[:, :, None]
-    */
-
-}
-
-void get_system_matrices(std::string & /*system*/) {}
-
-}  // namespace tools
-}  // namespace gecko
+}  // namespace mpc
+}  // namespace nimbleone
 #endif

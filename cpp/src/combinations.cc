@@ -7,43 +7,25 @@
 
 #include <mpc-interface/combinations.hh>
 
-namespace gecko {
-namespace tools {
+namespace nimbleone {
+namespace mpc {
 
 using namespace Eigen;
 
-LineCombo::LineCombo(
-  std::map<std::string, Eigen::MatrixXd> combination,
-  std::vector<std::string> * data,
-  bool time_variant,
-  std::function<void(
-    void ** objects,
-    std::map<std::string, double> & kargs
-  )> how_to_update
-) : combination_(combination), data_(data) {
+LineCombo::LineCombo(std::map<std::string, Eigen::MatrixXd> combination)
+    : combination_(combination) {
 
-  time_variant_ = time_variant;
-  how_to_update_ = how_to_update;
+    // more complicated construction
+    for (const auto & c : combination_)
+    {
+        variables.push_back(c.first);
+        matrices.push_back(c.second);
+    }
 
-  // more complicated construction
-  for (const auto & c : combination_)
-  {
-    variables.push_back(c.first);
-    matrices.push_back(c.second);
-  }
-
-  for(size_t i =0; i < variables.size(); i++)
-  {
-    _coefficients.push_back(std::string("C") + std::to_string(i));
-  }
-}
-
-void LineCombo::__figuring_out(
-  void ** objects,
-  std::map<std::string, double> & kargs
-){
-    if(how_to_update_ && time_variant_)
-        how_to_update_(objects, kargs);
+    for(size_t i =0; i < variables.size(); i++)
+    {
+        _coefficients.push_back(std::string("C") + std::to_string(i));
+    }
 }
 
 MatrixXd & LineCombo::getitem(std::string variable)
@@ -92,11 +74,5 @@ std::string LineCombo::output()
     return output;
 }
 
-void LineCombo::update(std::map<std::string, double> & kargs)
-{
-    void *objects[] =  { static_cast<void*>(this) };
-    __figuring_out(objects, kargs);
-}
-
-}  // namespace tools
-}  // namespace gecko
+}  // namespace mpc
+}  // namespace nimbleone

@@ -12,6 +12,49 @@
 
 using namespace Eigen;
 
+void update_step_matrices() {
+  /*This function needs
+    count : int, representing the current time sample number
+    and one of the following:
+      step_times : ndarray or list with next step times.
+    or
+      regular_time : int, to produce steps regularly
+  */
+/*
+  auto matrices = shr_ext_sys->get_matrices();
+  auto S = std::get<1>(matrices);
+  unsigned int N = S.dimension(0);
+
+  double count = 0;
+  if (auto search = kargs.find("count"); search != kargs.end())
+    count = search->second;
+
+
+    if "step_times" in kargs.keys():
+        step_times = kargs["step_times"]
+        regular_time = None
+
+    elif "regular_time" in kargs.keys():
+        regular_time = kargs["regular_time"]
+        step_times = None
+
+    else:
+        raise KeyError(
+            "This funtion needs either 'step_times' or "
+            + "'regular_time', but the kargs "
+            + "introduced are {}".format(kargs.keys())
+        )
+
+    if "w_phase" in kargs.keys():
+        walking_phase = kargs["w_phase"]
+    else:
+        walking_phase = 0
+
+    U = plan_steps(N, count, step_times, regular_time, walking_phase)
+    extSyst.matrices[0] = U[:, :, None]
+    */
+}
+
 BOOST_AUTO_TEST_SUITE(BOOST_TEST_MODULE)
 
 BOOST_AUTO_TEST_CASE(test_extend_matrices_body) {
@@ -39,7 +82,7 @@ BOOST_AUTO_TEST_CASE(test_extend_matrices_body) {
   unsigned int N = 9; // horizon length
   Eigen::Tensor<double, 3> S; //tensor to multiply state
   Eigen::Tensor<double, 4> U; //tensor to multiply input
-  gecko::tools::extend_matrices(S, U, N, &A, &B);
+  nimbleone::mpc::extend_matrices(S, U, N, &A, &B);
 
   std::stringstream ssAa;
   write_output<Eigen::Matrix<double, Dynamic, Dynamic>>(

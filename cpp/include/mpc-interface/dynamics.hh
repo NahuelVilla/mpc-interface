@@ -1,5 +1,4 @@
 ///
-/// Gecko - Tools
 /// Author: Olivier Stasse
 /// Copyright: LAAS-CNRS
 /// Date: 2022
@@ -9,9 +8,7 @@
 /// Copyright2: Nimble One
 /// Date2: Aug 2023
 ///
-
-#ifndef GECKO_DYNAMICS_H_
-#define GECKO_DYNAMICS_H_
+#pragma once
 
 #include <Eigen/Eigen>
 #include <functional>
@@ -29,8 +26,8 @@
 
 #include <mpc-interface/combinations.hh>
 
-namespace gecko {
-namespace tools {
+namespace nimbleone {
+namespace mpc {
 
 class DomainVariable
 {
@@ -41,17 +38,7 @@ public:
   void init(
     std::vector<std::string> & names,
     std::vector<int> & sizes,
-    std::vector<std::string> & axes,
-    bool time_variant,
-    std::function<void(
-      void ** objects,
-      std::map<std::string, double> & kargs
-    )> how_to_update_size
-  );
-
-  void __figuring_out(
-    void ** objects,
-    std::map<std::string, double> & kargs
+    std::vector<std::string> & axes
   );
 
   void identify_domain(std::vector<std::string> & names);
@@ -60,27 +47,14 @@ public:
   void make_definitions();
   void define_output(
     std::string & name,
-    std::map<std::string, int> & combination,
-    bool time_variant,
-    std::function<void(
-      void ** objects,
-      std::map<std::string, double> & kargs
-    )> how_to_update
+    std::map<std::string, int> & combination
   );
   void update_definitions();
-  void update(std::map<std::string, double> & kargs);
 
 private:
   std::vector<std::string> names_;
   std::vector<int> sizes_;
   std::vector<std::string> axes_;
-
-  bool time_variant_;
-  std::function<void(
-    void ** objects,
-    std::map<std::string, double> & kargs
-  )> how_to_update_size_;
-
   std::map<std::string, int> domain_ID;
   std::map<std::string, int> domain;
   std::map<std::string, int> all_variables;
@@ -110,17 +84,8 @@ public:
     std::vector<std::string> &input_names,
     std::vector<std::string> &state_names,
     Eigen::MatrixXd *A, Eigen::MatrixXd *B,
-    std::vector<std::string> &axes,
-    bool time_variant,
-    std::function<void(
-      void ** objects,
-      std::map<std::string, double> & kargs
-    )> how_to_update_matrices
+    std::vector<std::string> &axes
   );
-
-  void update_matrices(
-    void ** objects,
-    std::map<std::string, double> & kargs);
 
   /// getters
   std::vector<std::string> & get_input_names();
@@ -128,7 +93,6 @@ public:
   Eigen::MatrixXd * get_matrix_A();
   Eigen::MatrixXd * get_matrix_B();
   std::vector<std::string> & get_axes();
-  bool is_time_variant();
 
 private:
   /// Store the names of the inputs
@@ -144,15 +108,6 @@ private:
   Eigen::MatrixXd B_;
 
   std::vector<std::string> axes_;
-
-  /// Is the system time variant ?
-  bool time_variant_;
-
-  /// Ref to callback method
-  std::function<void(
-    void ** objects,
-    std::map<std::string, double> & kargs
-  )> how_to_update_matrices_;
 };
 
 class ExtendedSystem {
@@ -164,12 +119,7 @@ public:
     std::vector<std::string> &input_names,
     std::vector<std::string> &state_names,
     std::string &state_vector_name,
-    std::vector<std::string> &axes,
-    bool time_variant,
-    std::function<void(
-      void ** objects,
-      std::map<std::string, double> & kargs
-    )> how_to_update_matrices
+    std::vector<std::string> &axes
   );
 
   void init_from_control_system(
@@ -224,22 +174,9 @@ private:
   /// List of axis in the model
   std::vector<std::string> axes_;
 
-  /// Matrices is a tuple of tensors
-  //std::tuple<Eigen::Tensor<double, 4> &, Eigen::Tensor<double, 3> &> matrices_;
-
   /// Horizon Length
   int horizon_length_;
-
-  /// Is the system time variant ?
-  bool time_variant_;
-
-  /// Ref to callback method
-  std::function<void(
-    void ** objects,
-    std::map<std::string, double> & kargs
-  )> how_to_update_matrices_;
 };
 
-}  // namespace tools
-}  // namespace gecko
-#endif
+}  // namespace mpc
+}  // namespace nimbleone
