@@ -25,7 +25,7 @@ class Cost:
         ARGUMENTS:
 
             variable : str
-            weight : float positive
+            weight : ndarray with shape [m, 1]
             aim : ndarray with shape [m, len(axes)] .
             axes : list of strings of the form ["_x", "_y"]. Defaults to [""]
             L : list of ndarray with shapes [m, t]. Defaults to []
@@ -67,7 +67,7 @@ class Cost:
         self.variable = variable
         aim = np.zeros([1, self.axes_len]) if aim is None else aim
         self.aim = np.array(aim).reshape([-1, self.axes_len])
-        self.weight = weight
+        self.weight = np.array(weight).reshape([-1, 1])
 
         self.schedule = schedule if schedule else range(0)
         self.L = [] if L is None else self.arrange_L(L)
@@ -109,11 +109,46 @@ class Cost:
         if aim is None:
             self.aim = np.vstack([self.aim[1:, :], self.aim[-1, :]])
             if not self.crossed:
+                #TODO: add the crossed aim in case it is defined.
                 self.cross_aim = self.aim
         else:
             self.aim = np.vstack([self.aim[1:, :], aim.reshape([-1, self.axes_len])[-1, :]])
             if not self.crossed:
                 self.cross_aim = self.aim
+
+    def __check_geometry(self):
+        rows = np.array(
+            [self.aim.shape[0], self.cross_aim.shape[0], self.weight.shape[0]]
+        )
+        rows_not_1 = rows[rows != 1]
+
+        if np.any(rows_not_1) and np.any(rows_not_1 != rows_not_1[0]):
+            raise ValueError(
+                "The number of rows in 'aim', 'cross_aim' and "
+                + "'weight' must be equal or 1, but they are "
+                + "{} respectively".format(rows)
+            )
+        if self.axes_len > 1:
+            cols = np.array([self.aim.shape[1], self.cross_aim.shape[1]])
+            if np.any(cols != self.axes_len):
+                raise IndexError(
+                    (
+                        "'aim' and 'cross_aim' have {} columns "
+                        + "but they must have {}, one per axis."
+                    ).format(cols, self.axes_len)
+                )
+
+    def __check_geometry_with_L(self):
+        rows = np.array(
+            [self.aim.shape[0], self.cross_aim.shape[0], self.weight.shape[0]]
+        )
+
+        if np.any(rows != 1) and np.any(rows != self.m):
+            raise ValueError(
+                "The number of rows in 'aim', 'cross_aim' and "
+                + "'weight' must be m or 1, but they are "
+                + "{} respectively while m is {}".format(rows, self.m)
+            )
 
     def update(
         self, aim=None, weight=None, L=None, schedule=None, cross_aim=None, cross_L=None
@@ -139,18 +174,31 @@ class Cost:
                 self.cross_aim = self.aim
 
         if weight is not None:
-            self.weight = weight
+            self.weight = np.array(weight).reshape([-1, 1])
 
         if cross_aim is not None:
             if self.crossed:
-                self.cross_aim = cross_aim
+                self.cross_aim = np.array(cross_aim).reshape([-1, self.axes_len])
             else:
                 raise KeyError("Trying to set cross_aim in a non-crossed cost")
+
+        if aim is not None or cross_aim is not None or weight is not None:
+            if self.L:
+                self.__check_geometry_with_L()
+            else:
+                self.__check_geometry()
+
 
     @property
     def t(self):
         if self.schedule:
             return self.schedule.stop - self.schedule.start
+        return None
+
+    @property
+    def m(self):
+        if self.L:
+            return self.L[0].shape[0]
         return None
 
     def __str__(self):

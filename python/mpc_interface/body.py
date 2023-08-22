@@ -290,12 +290,10 @@ class Formulation:
                 cMg = self.PM[cro][0][schedule]
                 cMo = self.PM[cro][1][schedule]
 
-            Q += cost.weight * vMo.T @ cMo
-            q += (
-                cost.weight
-                * (
-                    vMo.T @ (cMg @ given - cost.cross_aim[:, i, None])
-                    + cMo.T @ (vMg @ given - cost.aim[:, i, None])
+            Q += vMo.T @ (cost.weight * cMo)
+            q += ( (
+                    vMo.T @ (cost.weight * (cMg @ given - cost.cross_aim[:, i, None]))
+                    + cMo.T @ (cost.weight * (vMg @ given - cost.aim[:, i, None]))
                 )
                 / 2
             )
